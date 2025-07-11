@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Pixel Art Styles */
+@layer components {
+  .pixel-card {
+    @apply backdrop-blur-md bg-white/20 border-4 border-gray-600 p-6;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+  }
+
+  .pixel-card-hover {
+    @apply backdrop-blur-md bg-white/20 border-4 border-gray-600 hover:bg-white/30 transition-all duration-300 hover:shadow-xl hover:scale-105;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+  }
+
+  .pixel-header {
+    @apply border-t-4 border-l-4 border-r-4 border-gray-600;
+    image-rendering: pixelated;
+  }
+
+  .pixel-button {
+    @apply rounded-none border-2 border-gray-600 transition-all duration-200;
+    image-rendering: pixelated;
+  }
+
+  .pixel-button-3d {
+    @apply rounded-none border-2 shadow-lg;
+    box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.3);
+    image-rendering: pixelated;
+  }
+
+  .pixel-button-3d:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
+  }
+
+  .pixel-input {
+    @apply rounded-none;
+    image-rendering: pixelated;
+  }
+
+  .pixel-badge {
+    @apply rounded-none border-2;
+    image-rendering: pixelated;
+    box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2);
+  }
+
+  .pixel-badge-small {
+    @apply rounded-none border;
+    image-rendering: pixelated;
+    box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.2);
+  }
+
+  .pixel-tag {
+    @apply rounded-none border;
+    image-rendering: pixelated;
+  }
+
+  .pixel-tag-small {
+    @apply rounded-none border;
+    image-rendering: pixelated;
+    font-size: 10px;
+  }
+
+  .pixel-icon {
+    @apply rounded-none;
+    image-rendering: pixelated;
+    box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
+  }
+
+  .pixel-icon-small {
+    @apply rounded-none;
+    image-rendering: pixelated;
+    box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.3);
+  }
+
+  .pixel-avatar {
+    @apply rounded-none;
+    image-rendering: pixelated;
+    box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.3);
+  }
+
+  .pixel-dot {
+    @apply rounded-none;
+    image-rendering: pixelated;
+  }
+
+  /* Clean Pixel Art Text Effects - NO GLOW */
+  .pixel-text-shadow {
+    text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Line clamp utilities */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
