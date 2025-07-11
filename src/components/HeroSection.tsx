@@ -107,9 +107,9 @@ const HeroSection = () => {
       <div className="relative z-10 text-center px-4 sm:px-6 animate-slide-up max-w-6xl mx-auto">
         {/* Main Headline - Responsive text sizes */}
         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-pixel font-bold text-gray-800 mb-6 sm:mb-8 leading-tight uppercase tracking-wider pixel-text-shadow">
-          <span className="inline-block bg-white/20 border-2 sm:border-4 border-gray-800 px-2 sm:px-4 py-1 sm:py-2 mb-2 shadow-lg">Mint Ideas.</span><br />
-          <span className="inline-block bg-sunset-coral/20 border-2 sm:border-4 border-red-600 px-2 sm:px-4 py-1 sm:py-2 mb-2 shadow-lg text-sunset-coral">Build Teams.</span><br />
-          <span className="inline-block bg-sky-blue/20 border-2 sm:border-4 border-blue-600 px-2 sm:px-4 py-1 sm:py-2 shadow-lg text-sky-blue">Rule Web3.</span>
+          <span className="inline-block bg-white/20 border-2 sm:border-4 border-gray-800 px-2 sm:px-4 py-1 sm:py-2 mb-2 shadow-lg">Own Ideas.</span><br />
+          <span className="inline-block bg-sunset-coral/20 border-2 sm:border-4 border-red-600 px-2 sm:px-4 py-1 sm:py-2 mb-2 shadow-lg text-sunset-coral">Stake Teams.</span><br />
+          <span className="inline-block bg-sky-blue/20 border-2 sm:border-4 border-blue-600 px-2 sm:px-4 py-1 sm:py-2 shadow-lg text-sky-blue">Build Worlds.</span>
         </h1>
 
         {/* Subtext - Responsive */}
