@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Users, Crown, Shield, Sword, Star, Zap, Plus, UserPlus, MessageCircle, Calendar, Target, DollarSign, Lock, Upload, FileText } from 'lucide-react';
-import { useApp } from '../contexts/AppContext';
+import { useWallet } from '../contexts/WalletContext';
 
 interface TeamMember {
   id: number;
@@ -38,10 +38,11 @@ interface TeamDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onJoinTeam: (teamId: number, role: string, stakeAmount: number) => void;
+  onViewDashboard: (team: Team) => void;
 }
 
-const TeamDetailModal: React.FC<TeamDetailModalProps> = ({ team, isOpen, onClose, onJoinTeam }) => {
-  const { user } = useApp();
+const TeamDetailModal: React.FC<TeamDetailModalProps> = ({ team, isOpen, onClose, onJoinTeam, onViewDashboard }) => {
+  const { isConnected, address, hasSuperheroIdentity, superheroName } = useWallet();
   const [selectedRole, setSelectedRole] = useState('');
   const [applicationMessage, setApplicationMessage] = useState('');
 
@@ -101,13 +102,18 @@ const TeamDetailModal: React.FC<TeamDetailModalProps> = ({ team, isOpen, onClose
   };
 
   const handleJoinTeam = () => {
-    if (!user || !selectedRole) return;
+    if (!isConnected || !address || !hasSuperheroIdentity || !selectedRole) return;
     onJoinTeam(team.id, selectedRole, team.stakeAmount);
     onClose();
   };
 
-  const isUserInTeam = user && (team.leader.name === user.name || team.members.some(member => member.name === user.name));
-  const isUserTeamLeader = user && team.leader.name === user.name;
+  // For now, we'll use superhero name for team membership checks since the team data uses names
+  // In a real implementation, this would use wallet addresses
+  const isUserInTeam = isConnected && superheroName && (
+    team.leader.name === superheroName || 
+    team.members.some(member => member.name === superheroName)
+  );
+  const isUserTeamLeader = isConnected && superheroName && team.leader.name === superheroName;
 
   // CRITICAL: For recruiting teams, show basic info only - NO DETAILED PROJECT INFO
   const isRecruitingTeam = team.isRecruiting && !team.isFull;
@@ -232,7 +238,7 @@ const TeamDetailModal: React.FC<TeamDetailModalProps> = ({ team, isOpen, onClose
                   </h3>
                   <div className="text-center">
                     <div className="font-pixel font-bold text-pixel-2xl text-yellow-600 mb-2">
-                      {team.stakeAmount} IDEA
+                      {team.stakeAmount} USDC
                     </div>
                     <p className="font-orbitron text-pixel-xs text-yellow-700 uppercase tracking-wide">
                       Tokens required to join this team
@@ -301,7 +307,7 @@ const TeamDetailModal: React.FC<TeamDetailModalProps> = ({ team, isOpen, onClose
                 </div>
 
                 {/* Action Section */}
-                {user && !isUserInTeam && team.isRecruiting && !team.isFull && (
+                {isConnected && address && !isUserInTeam && team.isRecruiting && !team.isFull && hasSuperheroIdentity && (
                   <div className="bg-green-50 border-2 border-green-400 p-4">
                     <h3 className="font-pixel font-bold text-pixel-sm text-green-800 mb-3 uppercase tracking-wider">
                       Join This Team
@@ -327,7 +333,7 @@ const TeamDetailModal: React.FC<TeamDetailModalProps> = ({ team, isOpen, onClose
                     {/* Staking Notice */}
                     <div className="mb-4 p-3 bg-yellow-100 border border-yellow-400">
                       <p className="font-orbitron text-pixel-xs text-yellow-700 uppercase tracking-wide text-center">
-                        You will stake {team.stakeAmount} IDEA tokens to join
+                        You will stake {team.stakeAmount} USDC tokens to join
                       </p>
                     </div>
 
@@ -357,6 +363,48 @@ const TeamDetailModal: React.FC<TeamDetailModalProps> = ({ team, isOpen, onClose
                   </div>
                 )}
 
+                {/* Non-connected users */}
+                {!isConnected && team.isRecruiting && !team.isFull && (
+                  <div className="bg-blue-50 border-2 border-blue-400 p-4 text-center">
+                    <div className="w-12 h-12 bg-blue-100 border-2 border-blue-400 flex items-center justify-center text-3xl mx-auto mb-3">
+                      🔗
+                    </div>
+                    <h3 className="font-pixel font-bold text-pixel-sm text-blue-800 mb-2 uppercase tracking-wider">
+                      Connect Wallet Required
+                    </h3>
+                    <p className="font-orbitron text-pixel-xs text-blue-700 mb-4 uppercase tracking-wide">
+                      Connect your wallet to join this team.
+                    </p>
+                    <button 
+                      onClick={onClose}
+                      className="w-full bg-blue-500 text-white py-2 border-2 border-blue-700 font-pixel font-bold text-pixel-sm hover:bg-blue-600 transition-all duration-200 uppercase tracking-wider"
+                    >
+                      CONNECT WALLET
+                    </button>
+                  </div>
+                )}
+
+                {/* Non-superhero users */}
+                {isConnected && address && !isUserInTeam && team.isRecruiting && !team.isFull && !hasSuperheroIdentity && (
+                  <div className="bg-orange-50 border-2 border-orange-400 p-4 text-center">
+                    <div className="w-12 h-12 bg-orange-100 border-2 border-orange-400 flex items-center justify-center text-3xl mx-auto mb-3">
+                      🦸‍♂️
+                    </div>
+                    <h3 className="font-pixel font-bold text-pixel-sm text-orange-800 mb-2 uppercase tracking-wider">
+                      Superhero Required
+                    </h3>
+                    <p className="font-orbitron text-pixel-xs text-orange-700 mb-4 uppercase tracking-wide">
+                      Only superheroes can join teams. Create your superhero identity first.
+                    </p>
+                    <button 
+                      onClick={onClose}
+                      className="w-full bg-orange-500 text-white py-2 border-2 border-orange-700 font-pixel font-bold text-pixel-sm hover:bg-orange-600 transition-all duration-200 uppercase tracking-wider"
+                    >
+                      CREATE SUPERHERO
+                    </button>
+                  </div>
+                )}
+
                 {/* Already in team */}
                 {isUserInTeam && (
                   <div className="bg-blue-50 border-2 border-blue-400 p-4 text-center">
@@ -366,9 +414,30 @@ const TeamDetailModal: React.FC<TeamDetailModalProps> = ({ team, isOpen, onClose
                     <h3 className="font-pixel font-bold text-pixel-sm text-blue-800 mb-2 uppercase tracking-wider">
                       You're in this team!
                     </h3>
-                    <button className="w-full bg-blue-500 text-white py-2 border-2 border-blue-700 font-pixel font-bold text-pixel-sm hover:bg-blue-600 transition-all duration-200 uppercase tracking-wider">
+                    <button 
+                      onClick={() => onViewDashboard(team)}
+                      className="w-full bg-blue-500 text-white py-2 border-2 border-blue-700 font-pixel font-bold text-pixel-sm hover:bg-blue-600 transition-all duration-200 uppercase tracking-wider"
+                    >
                       VIEW TEAM DASHBOARD
                     </button>
+                  </div>
+                )}
+
+                {/* Team not recruiting or full */}
+                {isConnected && address && hasSuperheroIdentity && !isUserInTeam && (!team.isRecruiting || team.isFull) && (
+                  <div className="bg-gray-50 border-2 border-gray-400 p-4 text-center">
+                    <div className="w-12 h-12 bg-gray-200 border-2 border-gray-400 flex items-center justify-center text-2xl mx-auto mb-3">
+                      🔒
+                    </div>
+                    <h3 className="font-pixel font-bold text-pixel-sm text-gray-800 mb-2 uppercase tracking-wider">
+                      {team.isFull ? 'Team Full' : 'Not Recruiting'}
+                    </h3>
+                    <p className="font-orbitron text-pixel-xs text-gray-600 mb-4 uppercase tracking-wide">
+                      {team.isFull 
+                        ? 'This team has reached maximum capacity.'
+                        : 'This team is not currently recruiting new members.'
+                      }
+                    </p>
                   </div>
                 )}
 
@@ -460,7 +529,7 @@ const TeamDetailModal: React.FC<TeamDetailModalProps> = ({ team, isOpen, onClose
                         <div className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">{team.leader.name}</div>
                         {team.leader.stakedTokens && (
                           <div className="font-pixel text-pixel-xs text-yellow-600 uppercase tracking-wider">
-                            {team.leader.stakedTokens} IDEA
+                            {team.leader.stakedTokens} USDC
                           </div>
                         )}
                       </div>
@@ -479,7 +548,7 @@ const TeamDetailModal: React.FC<TeamDetailModalProps> = ({ team, isOpen, onClose
                                 <div className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">{member.name}</div>
                                 {member.stakedTokens && (
                                   <div className="font-pixel text-pixel-xs text-yellow-600 uppercase tracking-wider">
-                                    {member.stakedTokens} IDEA
+                                    {member.stakedTokens} USDC
                                   </div>
                                 )}
                               </>
@@ -524,7 +593,7 @@ const TeamDetailModal: React.FC<TeamDetailModalProps> = ({ team, isOpen, onClose
                   </h3>
                   <div className="text-center">
                     <div className="font-pixel font-bold text-pixel-2xl text-yellow-600 mb-2">
-                      {team.stakeAmount} IDEA
+                      {team.stakeAmount} USDC
                     </div>
                     <p className="font-orbitron text-pixel-xs text-yellow-700 uppercase tracking-wide">
                       Tokens required to join this team
@@ -601,7 +670,10 @@ const TeamDetailModal: React.FC<TeamDetailModalProps> = ({ team, isOpen, onClose
                     <h3 className="font-pixel font-bold text-pixel-sm text-blue-800 mb-2 uppercase tracking-wider">
                       You're in this team!
                     </h3>
-                    <button className="w-full bg-blue-500 text-white py-2 border-2 border-blue-700 font-pixel font-bold text-pixel-sm hover:bg-blue-600 transition-all duration-200 uppercase tracking-wider">
+                    <button 
+                      onClick={() => onViewDashboard(team)}
+                      className="w-full bg-blue-500 text-white py-2 border-2 border-blue-700 font-pixel font-bold text-pixel-sm hover:bg-blue-600 transition-all duration-200 uppercase tracking-wider"
+                    >
                       VIEW TEAM DASHBOARD
                     </button>
                   </div>

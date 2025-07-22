@@ -1,6 +1,6 @@
-import React from 'react';
-import { X, Wallet, Shield, Zap } from 'lucide-react';
-import { useApp } from '../contexts/AppContext';
+import React, { useState, useEffect } from 'react';
+import { X, Wallet, Shield, Zap, Loader } from 'lucide-react';
+import { useWallet } from '../contexts/WalletContext';
 
 interface WalletModalProps {
   isOpen: boolean;
@@ -8,13 +8,37 @@ interface WalletModalProps {
 }
 
 const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => {
-  const { connectWallet } = useApp();
+  const { connectWallet, isLoading, error: walletError } = useWallet();
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      console.log('🔳 WalletModal opened');
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleConnect = (walletType: string) => {
-    connectWallet();
-    onClose();
+  const handleConnect = async (walletType: string) => {
+    console.log('🦊 MetaMask connect button clicked, type:', walletType);
+    
+    if (walletType !== 'metamask') {
+      console.log('❌ Unsupported wallet type:', walletType);
+      setError('Only MetaMask is supported at this time');
+      return;
+    }
+
+    setError(null);
+    console.log('✅ Starting MetaMask connection...');
+
+    try {
+      await connectWallet();
+      console.log('✅ Connection successful, closing modal...');
+      onClose();
+    } catch (err) {
+      console.error('❌ Connection failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to connect wallet');
+    }
   };
 
   return (
@@ -39,48 +63,64 @@ const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => {
             Choose your preferred wallet to connect to IdeaMan
           </p>
 
+          {/* Error Message */}
+          {(error || walletError) && (
+            <div className="mb-4 p-3 bg-red-100 border-2 border-red-400 text-red-700 font-orbitron text-pixel-xs uppercase tracking-wide">
+              {error || walletError}
+            </div>
+          )}
+
           {/* Wallet Options */}
           <div className="space-y-3">
             <button
               onClick={() => handleConnect('metamask')}
-              className="w-full flex items-center space-x-4 p-4 bg-orange-100 border-2 border-orange-400 hover:bg-orange-200 transition-all duration-200 group"
+              disabled={isLoading}
+              className="w-full flex items-center space-x-4 p-4 bg-orange-100 border-2 border-orange-400 hover:bg-orange-200 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="w-12 h-12 bg-orange-500 border-2 border-orange-700 flex items-center justify-center">
-                <span className="text-2xl">🦊</span>
+                {isLoading ? (
+                  <Loader className="w-6 h-6 text-white animate-spin" />
+                ) : (
+                  <span className="text-2xl">🦊</span>
+                )}
               </div>
               <div className="flex-1 text-left">
                 <div className="font-pixel font-bold text-pixel-sm text-gray-800 uppercase tracking-wider">MetaMask</div>
-                <div className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">Most popular wallet</div>
+                <div className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">
+                  {isLoading ? 'Connecting...' : 'Recommended for Lisk Sepolia'}
+                </div>
               </div>
               <Wallet className="w-5 h-5 text-orange-600 group-hover:scale-110 transition-transform" />
             </button>
 
             <button
               onClick={() => handleConnect('walletconnect')}
-              className="w-full flex items-center space-x-4 p-4 bg-blue-100 border-2 border-blue-400 hover:bg-blue-200 transition-all duration-200 group"
+              disabled={isLoading}
+              className="w-full flex items-center space-x-4 p-4 bg-gray-100 border-2 border-gray-400 cursor-not-allowed opacity-50 transition-all duration-200 group"
             >
-              <div className="w-12 h-12 bg-blue-500 border-2 border-blue-700 flex items-center justify-center">
+              <div className="w-12 h-12 bg-gray-500 border-2 border-gray-700 flex items-center justify-center">
                 <span className="text-2xl">🔗</span>
               </div>
               <div className="flex-1 text-left">
                 <div className="font-pixel font-bold text-pixel-sm text-gray-800 uppercase tracking-wider">WalletConnect</div>
-                <div className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">Connect any wallet</div>
+                <div className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">Coming soon</div>
               </div>
-              <Shield className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform" />
+              <Shield className="w-5 h-5 text-gray-600" />
             </button>
 
             <button
               onClick={() => handleConnect('coinbase')}
-              className="w-full flex items-center space-x-4 p-4 bg-purple-100 border-2 border-purple-400 hover:bg-purple-200 transition-all duration-200 group"
+              disabled={isLoading}
+              className="w-full flex items-center space-x-4 p-4 bg-gray-100 border-2 border-gray-400 cursor-not-allowed opacity-50 transition-all duration-200 group"
             >
-              <div className="w-12 h-12 bg-purple-500 border-2 border-purple-700 flex items-center justify-center">
+              <div className="w-12 h-12 bg-gray-500 border-2 border-gray-700 flex items-center justify-center">
                 <span className="text-2xl">💎</span>
               </div>
               <div className="flex-1 text-left">
                 <div className="font-pixel font-bold text-pixel-sm text-gray-800 uppercase tracking-wider">Coinbase Wallet</div>
-                <div className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">Easy to use</div>
+                <div className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">Coming soon</div>
               </div>
-              <Zap className="w-5 h-5 text-purple-600 group-hover:scale-110 transition-transform" />
+              <Zap className="w-5 h-5 text-gray-600" />
             </button>
           </div>
 
@@ -88,10 +128,10 @@ const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => {
           <div className="mt-6 p-3 bg-yellow-100 border-2 border-yellow-400">
             <div className="flex items-center space-x-2 mb-2">
               <Shield className="w-4 h-4 text-yellow-600" />
-              <span className="font-pixel font-bold text-pixel-xs text-yellow-800 uppercase tracking-wider">Security Notice</span>
+              <span className="font-pixel font-bold text-pixel-xs text-yellow-800 uppercase tracking-wider">Network Notice</span>
             </div>
             <p className="font-orbitron text-pixel-xs text-yellow-700 uppercase tracking-wide">
-              Never share your private keys. IdeaMan will never ask for your seed phrase.
+              This app uses Lisk Sepolia testnet. MetaMask will prompt you to add/switch networks.
             </p>
           </div>
         </div>

@@ -1,21 +1,181 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Star, Users, Zap, Calendar, Target, MessageCircle, Edit, Share, Heart, Eye, DollarSign } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
+import { useWallet } from '../contexts/WalletContext';
+import { ApiService } from '../services/api';
 import BuilderRatingModal from '../components/BuilderRatingModal';
 
 const ProfilePage = () => {
   const { id } = useParams();
   const { builders, ideas, user, rateBuilder, getBuilderRating } = useApp();
+  const { isConnected, address, hasSuperheroIdentity, superheroName } = useWallet();
   const [activeTab, setActiveTab] = useState('overview');
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
+  const [currentUserSuperhero, setCurrentUserSuperhero] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Find the superhero by ID
-  const superhero = builders.find(builder => builder.id === parseInt(id || '1'));
+  // Check if this is the current user's profile
+  const isCurrentUserProfile = id === 'me' || !id;
+
+  // Load current user's superhero profile if viewing own profile
+  useEffect(() => {
+    if (isCurrentUserProfile && isConnected &&  hasSuperheroIdentity && address) {
+      // Always try to load profile if we have an address, don't wait for hasSuperheroIdentity
+      loadCurrentUserProfile();
+    }
+  }, [isCurrentUserProfile, isConnected, hasSuperheroIdentity, address]);
+
+  const loadCurrentUserProfile = async () => {
+    if (!address) return;
+    
+    setLoading(true);
+    try {
+      console.log('🔍 Loading current user superhero profile for:', address);
+      
+      // Try to get superhero profile from API
+      const superheroResponse = await ApiService.getSuperheroByAddress(address);
+      
+      if (superheroResponse.success && superheroResponse.data) {
+        const apiSuperhero = superheroResponse.data;
+        
+        // Transform API superhero to Builder format
+        const transformedSuperhero = {
+          id: apiSuperhero.superhero_id || 999,
+          name: apiSuperhero.name || superheroName || 'Current User',
+          username: `@${(apiSuperhero.name || superheroName || 'user').toLowerCase().replace(/\s+/g, '')}`,
+          avatar: apiSuperhero.avatar_url || '🦸‍♂️',
+          level: Math.floor((apiSuperhero.reputation || 0) / 100) + 1,
+          reputation: apiSuperhero.reputation || 0,
+          specialties: Array.isArray(apiSuperhero.specialities) ? apiSuperhero.specialities : ['Blockchain', 'Web3'],
+          achievements: ['Blockchain Pioneer', 'Builder'],
+          teamsFormed: 0,
+          ideasMinted: 0,
+          bgGradient: 'from-sunset-coral/20 to-sky-blue/20',
+          location: 'Decentralized',
+          joinedDate: apiSuperhero.created_at ? 
+            new Date(typeof apiSuperhero.created_at === 'string' ? apiSuperhero.created_at : apiSuperhero.created_at * 1000).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) :
+            new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          bio: apiSuperhero.bio || 'A superhero building the future of Web3',
+          skills: Array.isArray(apiSuperhero.skills) ? apiSuperhero.skills : ['Smart Contracts', 'DeFi', 'NFTs'],
+          currentProjects: 1,
+          followers: 0,
+          following: 0,
+          isOnline: true,
+          featured: false,
+          pixelColor: 'from-green-400 to-emerald-500',
+          rating: 0,
+          totalRatings: 0,
+        };
+        
+        console.log('✅ Loaded current user superhero profile:', transformedSuperhero);
+        setCurrentUserSuperhero(transformedSuperhero);
+      } else {
+        console.log('❌ No superhero profile found for current user');
+      }
+    } catch (error) {
+      console.error('❌ Failed to load current user superhero profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Find the superhero to display
+  let superhero = null;
+  
+  if (isCurrentUserProfile) {
+    // For current user, use the loaded profile or create a basic one
+    if (isConnected && hasSuperheroIdentity) {
+      superhero = currentUserSuperhero || {
+        id: 999,
+        name: superheroName || 'Current User',
+        username: `@${(superheroName || 'user').toLowerCase().replace(/\s+/g, '')}`,
+        avatar: '🦸‍♂️',
+        level: 1,
+        reputation: 100,
+        specialties: ['Web3', 'Blockchain'],
+        achievements: ['New Superhero'],
+        teamsFormed: 0,
+        ideasMinted: 0,
+        bgGradient: 'from-sunset-coral/20 to-sky-blue/20',
+        location: 'Decentralized',
+        joinedDate: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        bio: 'A superhero building the future of Web3',
+        skills: ['Smart Contracts', 'DeFi'],
+        currentProjects: 0,
+        followers: 0,
+        following: 0,
+        isOnline: true,
+        featured: false,
+        pixelColor: 'from-green-400 to-emerald-500',
+        rating: 0,
+        totalRatings: 0,
+      };
+    }
+  } else {
+    // For other users, find by ID from builders array
+    superhero = builders.find(builder => builder.id === parseInt(id || '1'));
+  }
   
   // Get superhero's ideas
   const superheroIdeas = ideas.filter(idea => idea.creator === superhero?.name);
   
+  // Show loading for current user profile while fetching
+  if (isCurrentUserProfile && loading) {
+    return (
+      <div className="relative z-10 min-h-screen pt-8 pb-12 bg-dreamy-gradient flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-sunset-coral mx-auto mb-4"></div>
+          <p className="text-pixel-lg font-orbitron text-gray-600 uppercase tracking-wide">
+            Loading your profile...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show connect wallet message if not connected
+  if (isCurrentUserProfile && !isConnected) {
+    return (
+      <div className="relative z-10 min-h-screen pt-8 pb-12 bg-dreamy-gradient flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-pixel-4xl font-pixel font-bold text-gray-800 mb-4 uppercase tracking-wider pixel-text-shadow">
+            Connect Wallet
+          </h1>
+          <p className="text-pixel-lg font-orbitron text-gray-600 uppercase tracking-wide">
+            Please connect your wallet to view your profile
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show create superhero prompt if current user doesn't have superhero identity
+  if (isCurrentUserProfile && isConnected && !hasSuperheroIdentity) {
+    return (
+      <div className="relative z-10 min-h-screen pt-8 pb-12 bg-dreamy-gradient flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-pixel-4xl font-pixel font-bold text-gray-800 mb-4 uppercase tracking-wider pixel-text-shadow">
+            Create Your Superhero
+          </h1>
+          <p className="text-pixel-lg font-orbitron text-gray-600 uppercase tracking-wide mb-2">
+            Address: {address}
+          </p>
+          <p className="text-pixel-lg font-orbitron text-gray-600 uppercase tracking-wide mb-6">
+            You haven't created your superhero identity yet
+          </p>
+          <a 
+            href="/create-superhero"
+            className="inline-block bg-gradient-to-r from-sunset-coral to-sky-blue text-white font-pixel text-pixel-lg px-8 py-4 border-4 border-gray-800 hover:transform hover:scale-105 transition-all duration-200 uppercase tracking-wider pixel-text-shadow"
+          >
+            Create Superhero
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if superhero not found (for other users or if current user has issues)
   if (!superhero) {
     return (
       <div className="relative z-10 min-h-screen pt-8 pb-12 bg-dreamy-gradient flex items-center justify-center">
@@ -24,8 +184,13 @@ const ProfilePage = () => {
             Superhero Not Found
           </h1>
           <p className="text-pixel-lg font-orbitron text-gray-600 uppercase tracking-wide">
-            The superhero you're looking for doesn't exist
+            {isCurrentUserProfile ? 'Unable to load your superhero profile' : 'The superhero you\'re looking for doesn\'t exist'}
           </p>
+          {isCurrentUserProfile && (
+            <p className="text-pixel-sm font-orbitron text-gray-500 uppercase tracking-wide mt-2">
+              Please try refreshing the page or check your wallet connection
+            </p>
+          )}
         </div>
       </div>
     );

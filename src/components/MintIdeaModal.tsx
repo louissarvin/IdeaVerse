@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { X, Sparkles, Upload, UserPlus, AlertCircle } from 'lucide-react';
+import { X, Sparkles, Upload, UserPlus, AlertCircle, Loader, CheckCircle, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useWallet } from '../contexts/WalletContext';
 import { useApp } from '../contexts/AppContext';
+import { ApiService } from '../services/api';
+import { contractService, ContractService } from '../services/contracts';
 
 interface MintIdeaModalProps {
   isOpen: boolean;
@@ -11,7 +14,8 @@ interface MintIdeaModalProps {
 const categories = ['DeFi', 'Gaming', 'Sustainability', 'Education', 'Art', 'Metaverse'];
 
 const MintIdeaModal: React.FC<MintIdeaModalProps> = ({ isOpen, onClose }) => {
-  const { mintNewIdea, user, builders } = useApp();
+  const { isConnected, address, hasSuperheroIdentity } = useWallet();
+  const { refreshIdeas } = useApp();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -19,15 +23,19 @@ const MintIdeaModal: React.FC<MintIdeaModalProps> = ({ isOpen, onClose }) => {
     price: '',
     attachments: [] as string[],
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [contentFile, setContentFile] = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   if (!isOpen) return null;
 
-  // Check if user has a superhero identity
-  const userSuperhero = user ? builders.find(builder => builder.name === user.name) : null;
-  const hasSuperheroIdentity = !!userSuperhero;
+  // Use real superhero identity check from WalletContext
 
   // If user doesn't have wallet connected
-  if (!user) {
+  if (!isConnected || !address) {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-white/95 border-4 border-gray-800 max-w-md w-full shadow-2xl">
@@ -182,34 +190,98 @@ const MintIdeaModal: React.FC<MintIdeaModalProps> = ({ isOpen, onClose }) => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || formData.categories.length === 0) return;
+    if (!address || formData.categories.length === 0) return;
 
-    const newIdea = {
-      title: formData.title,
-      description: formData.description,
-      creator: user.name,
-      avatar: user.avatar,
-      price: `${formData.price} ETH`,
-      isLocked: false,
-      category: formData.categories[0], // Use first category as primary
-      categories: formData.categories, // Store all selected categories
-      tags: formData.categories, // Use categories as tags
-      featured: false,
-      pixelColor: 'from-green-400 to-emerald-500', // Will be overridden in context
-      attachments: formData.attachments,
-    };
+    setIsSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    setProgress('Preparing idea data...');
 
-    mintNewIdea(newIdea);
-    onClose();
-    setFormData({
-      title: '',
-      description: '',
-      categories: [],
-      price: '',
-      attachments: [],
-    });
+    try {
+      console.log('🚀 Creating idea with NEW workflow:', {
+        title: formData.title,
+        description: formData.description,
+        categories: formData.categories,
+        price: parseFloat(formData.price),
+        userAddress: address,
+      });
+
+      // Step 1: Upload files and metadata to IPFS via backend
+      setProgress('Uploading files to IPFS...');
+      
+      const metadataResponse = await ApiService.prepareIdeaMetadata({
+        title: formData.title,
+        description: formData.description,
+        categories: formData.categories,
+        price: parseFloat(formData.price),
+        userAddress: address,
+      }, contentFile || undefined, imageFile || undefined);
+
+      if (!metadataResponse.success) {
+        throw new Error(metadataResponse.error?.message || 'Failed to upload metadata to IPFS');
+      }
+
+      console.log('✅ Metadata uploaded:', metadataResponse.data);
+
+      // Step 2: Connect to user's wallet and create idea on blockchain
+      setProgress('Connecting to your wallet...');
+      
+      if (!ContractService.isMetaMaskInstalled()) {
+        throw new Error('MetaMask is required. Please install MetaMask and try again.');
+      }
+
+      await contractService.connect();
+      
+      setProgress('Please confirm the transaction in your wallet...');
+      
+      const contractResult = await contractService.createIdea({
+        title: formData.title,
+        categories: formData.categories,
+        ipfsHash: metadataResponse.data.metadataHash,
+        price: parseFloat(formData.price)
+      });
+
+      console.log('✅ Blockchain transaction successful:', contractResult);
+
+      // Step 3: Show success message
+      setProgress(null);
+      setSuccess(`Idea created successfully! Transaction: ${contractResult.transactionHash.slice(0, 10)}... The indexer will pick it up shortly.`);
+      
+      // Refresh the ideas in the marketplace after a delay (indexer needs time)
+      setTimeout(async () => {
+        try {
+          await refreshIdeas();
+        } catch (e) {
+          console.log('Note: Ideas will appear when indexer processes the transaction');
+        }
+      }, 5000);
+      
+      // Wait a moment to show success message, then close
+      setTimeout(() => {
+        onClose();
+        // Reset form
+        setFormData({
+          title: '',
+          description: '',
+          categories: [],
+          price: '',
+          attachments: [],
+        });
+        setContentFile(null);
+        setImageFile(null);
+        setSuccess(null);
+        setProgress(null);
+      }, 3000);
+
+    } catch (err) {
+      console.error('❌ Failed to create idea:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create idea');
+      setProgress(null);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -235,18 +307,14 @@ const MintIdeaModal: React.FC<MintIdeaModalProps> = ({ isOpen, onClose }) => {
         <div className="p-4 bg-green-50 border-b-4 border-gray-800">
           <div className="flex items-center space-x-3">
             <div className="w-12 h-12 bg-gradient-to-br from-sunset-coral to-sky-blue border-2 border-gray-600 flex items-center justify-center text-lg overflow-hidden">
-              {typeof user.avatar === 'string' && user.avatar.startsWith('data:') ? (
-                <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                user.avatar
-              )}
+              🦸‍♂️
             </div>
             <div>
               <div className="font-pixel font-bold text-pixel-sm text-gray-800 uppercase tracking-wider">
-                {user.name}
+                {address ? `${address.slice(0,6)}...${address.slice(-4)}` : 'Connected'}
               </div>
               <div className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">
-                ✅ Verified Superhero
+                🔗 Wallet Connected
               </div>
             </div>
           </div>
@@ -254,6 +322,41 @@ const MintIdeaModal: React.FC<MintIdeaModalProps> = ({ isOpen, onClose }) => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Error Display */}
+          {error && (
+            <div className="p-4 bg-red-100 border-2 border-red-400 text-red-700">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5" />
+                <span className="font-orbitron text-pixel-sm uppercase tracking-wide">
+                  {error}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Success Display */}
+          {success && (
+            <div className="p-4 bg-green-100 border-2 border-green-400 text-green-700">
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="w-5 h-5" />
+                <span className="font-orbitron text-pixel-sm uppercase tracking-wide">
+                  {success}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Progress Display */}
+          {progress && (
+            <div className="p-4 bg-blue-100 border-2 border-blue-400 text-blue-700">
+              <div className="flex items-center space-x-2">
+                <Loader className="w-5 h-5 animate-spin" />
+                <span className="font-orbitron text-pixel-sm uppercase tracking-wide">
+                  {progress}
+                </span>
+              </div>
+            </div>
+          )}
           {/* Title */}
           <div>
             <label className="block font-pixel font-bold text-pixel-sm text-gray-800 mb-2 uppercase tracking-wider">
@@ -330,18 +433,22 @@ const MintIdeaModal: React.FC<MintIdeaModalProps> = ({ isOpen, onClose }) => {
           {/* Price */}
           <div>
             <label className="block font-pixel font-bold text-pixel-sm text-gray-800 mb-2 uppercase tracking-wider">
-              Price (ETH) *
+              Price (USDC) *
             </label>
             <input
               type="number"
               step="0.01"
               min="0.01"
+              max="10000"
               value={formData.price}
               onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
               className="w-full px-4 py-3 bg-white/50 border-2 border-gray-600 font-orbitron text-pixel-sm focus:outline-none focus:border-moss-green pixel-input uppercase tracking-wide"
               placeholder="0.00"
               required
             />
+            <p className="mt-1 font-orbitron text-pixel-xs text-gray-500 uppercase tracking-wide">
+              Price range: $0.01 - $10,000 USDC
+            </p>
           </div>
 
           {/* Upload Section */}
@@ -349,13 +456,66 @@ const MintIdeaModal: React.FC<MintIdeaModalProps> = ({ isOpen, onClose }) => {
             <label className="block font-pixel font-bold text-pixel-sm text-gray-800 mb-2 uppercase tracking-wider">
               Attachments (Optional)
             </label>
-            <div className="border-2 border-dashed border-gray-400 p-8 text-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer">
-              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="font-orbitron text-pixel-sm text-gray-600 uppercase tracking-wide">
-                Drag & drop files here or click to browse
-              </p>
-              <p className="font-orbitron text-pixel-xs text-gray-500 mt-2 uppercase tracking-wide">
-                Support: Images, Documents, Code files (Max 10MB each)
+            
+            {/* Content File Upload */}
+            <div className="mb-4">
+              <label className="block font-pixel font-bold text-pixel-xs text-gray-700 mb-2 uppercase tracking-wider">
+                Content File (Document, Code, etc.)
+              </label>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.txt,.md,.js,.ts,.py,.sol,.json"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    if (file.size > 10 * 1024 * 1024) {
+                      setError('Content file must be less than 10MB');
+                      return;
+                    }
+                    setContentFile(file);
+                    setError(null);
+                  }
+                }}
+                className="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:border-2 file:border-gray-600 file:text-pixel-xs file:font-pixel file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 file:uppercase file:tracking-wider"
+              />
+              {contentFile && (
+                <p className="mt-1 text-pixel-xs text-green-600 font-orbitron uppercase tracking-wide">
+                  ✓ {contentFile.name} ({(contentFile.size / 1024 / 1024).toFixed(2)}MB)
+                </p>
+              )}
+            </div>
+
+            {/* Image File Upload */}
+            <div>
+              <label className="block font-pixel font-bold text-pixel-xs text-gray-700 mb-2 uppercase tracking-wider">
+                Image File (Preview/Thumbnail)
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    if (file.size > 5 * 1024 * 1024) {
+                      setError('Image file must be less than 5MB');
+                      return;
+                    }
+                    setImageFile(file);
+                    setError(null);
+                  }
+                }}
+                className="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:border-2 file:border-gray-600 file:text-pixel-xs file:font-pixel file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 file:uppercase file:tracking-wider"
+              />
+              {imageFile && (
+                <p className="mt-1 text-pixel-xs text-green-600 font-orbitron uppercase tracking-wide">
+                  ✓ {imageFile.name} ({(imageFile.size / 1024 / 1024).toFixed(2)}MB)
+                </p>
+              )}
+            </div>
+
+            <div className="mt-4 p-3 bg-blue-100 border-2 border-blue-400">
+              <p className="font-orbitron text-pixel-xs text-blue-700 uppercase tracking-wide">
+                Files will be uploaded to IPFS for decentralized storage
               </p>
             </div>
           </div>
@@ -389,15 +549,19 @@ const MintIdeaModal: React.FC<MintIdeaModalProps> = ({ isOpen, onClose }) => {
           {/* Submit Button */}
           <div className="flex items-center justify-between pt-4">
             <div className="font-orbitron text-pixel-sm text-gray-600 uppercase tracking-wide">
-              Minting Fee: 0.01 ETH
+              Network: Lisk Sepolia
             </div>
             <button
               type="submit"
-              disabled={formData.categories.length === 0 || !formData.title || !formData.description || !formData.price}
+              disabled={formData.categories.length === 0 || !formData.title || !formData.description || !formData.price || isSubmitting}
               className="inline-flex items-center space-x-2 bg-gradient-to-r from-moss-green to-sky-blue text-white px-8 py-3 border-2 border-gray-800 font-pixel font-bold text-pixel-sm hover:shadow-xl transform hover:scale-105 transition-all duration-200 uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
-              <Sparkles className="w-4 h-4" />
-              <span>MINT IDEA NFT</span>
+              {isSubmitting ? (
+                <Loader className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
+              <span>{isSubmitting ? 'CREATING...' : 'MINT IDEA NFT'}</span>
             </button>
           </div>
         </form>

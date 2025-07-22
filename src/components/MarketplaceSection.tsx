@@ -1,19 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart, Lock, Unlock, DollarSign, User, Eye, ShoppingCart, CheckCircle, X, TrendingUp } from 'lucide-react';
-import { useApp } from '../contexts/AppContext';
+import { usePonderQuery } from '../hooks/usePonderQuery';
 import IdeaDetailModal from './IdeaDetailModal';
 
 const MarketplaceSection = () => {
-  const { ideas, likeIdea } = useApp();
+  const { getIdeas, loading, error } = usePonderQuery();
   const [selectedIdea, setSelectedIdea] = useState(null);
+  const [ideas, setIdeas] = useState([]);
+
+  // Load ideas from Ponder GraphQL
+  useEffect(() => {
+    const loadIdeas = async () => {
+      try {
+        const result = await getIdeas(20, false); // Get all ideas, not just available
+        setIdeas(result.items || []);
+      } catch (err) {
+        console.error('Failed to load ideas:', err);
+        // Fallback to empty array if loading fails
+        setIdeas([]);
+      }
+    };
+
+    loadIdeas();
+  }, [getIdeas]);
 
   // Separate available and sold ideas
-  const availableIdeas = ideas.filter(idea => !idea.isSold).slice(0, 4);
-  const soldIdeas = ideas.filter(idea => idea.isSold).slice(0, 4);
+  const availableIdeas = ideas.filter(idea => !idea.isPurchased).slice(0, 4);
+  const soldIdeas = ideas.filter(idea => idea.isPurchased).slice(0, 4);
 
   const handleIdeaClick = (idea) => {
-    // Don't allow viewing sold ideas
-    if (idea.isSold) {
+    // Don't allow viewing purchased ideas
+    if (idea.isPurchased) {
       return;
     }
     setSelectedIdea(idea);

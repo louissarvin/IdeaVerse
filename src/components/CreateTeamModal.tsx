@@ -1,11 +1,13 @@
 import React, { useState, useRef } from 'react';
-import { X, Crown, Plus, Minus, Users, Target, Sparkles, Upload, FileText, DollarSign } from 'lucide-react';
+import { X, Crown, Plus, Minus, Users, Target, Sparkles, Upload, FileText, DollarSign, Loader, AlertCircle } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
+import { useWallet } from '../contexts/WalletContext';
+import { ApiService } from '../services/api';
 
 interface CreateTeamModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreateTeam: (teamData: any) => void;
+  onCreateTeam: (teamData: any, projectFiles?: File[]) => void;
 }
 
 const availableRoles = ['Frontend', 'Backend', 'Designer', 'Product', 'Marketing', 'Blockchain'];
@@ -13,9 +15,18 @@ const availableTags = ['DeFi', 'Gaming', 'NFTs', 'Sustainability', 'AI', 'Metave
 
 const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ isOpen, onClose, onCreateTeam }) => {
   const { user } = useApp();
+  const { isConnected, address, hasSuperheroIdentity, superheroName } = useWallet();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Debug logging to understand the state issue
+  console.log('🏗️ CreateTeamModal state check:', {
+    isConnected,
+    address,
+    hasSuperheroIdentity,
+    superheroName
+  });
   const [currentStep, setCurrentStep] = useState(1);
-  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     project: '',
@@ -24,21 +35,106 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ isOpen, onClose, onCr
     requiredRoles: [] as string[],
     tags: [] as string[],
     requirements: [] as string[],
-    stakeAmount: 500,
+    stakeAmount: 100,
     projectFiles: [] as string[],
   });
   const [newRequirement, setNewRequirement] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  // Check if wallet is connected
+  if (!isConnected || !address) {
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white/95 border-4 border-gray-800 max-w-md w-full shadow-2xl">
+          <div className="flex items-center justify-between p-4 border-b-4 border-gray-800 bg-gradient-to-r from-red-500 to-orange-500">
+            <div className="flex items-center space-x-3">
+              <AlertCircle className="w-6 h-6 text-white" />
+              <h2 className="font-pixel font-bold text-pixel-lg text-white uppercase tracking-wider">
+                Wallet Required
+              </h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 bg-white/20 border-2 border-white flex items-center justify-center hover:bg-white/30 transition-colors"
+            >
+              <X className="w-4 h-4 text-white" />
+            </button>
+          </div>
+          <div className="p-6 text-center">
+            <div className="w-16 h-16 bg-red-100 border-4 border-red-400 flex items-center justify-center text-3xl mx-auto mb-4">
+              🔒
+            </div>
+            <h3 className="font-pixel font-bold text-pixel-xl text-gray-800 mb-3 uppercase tracking-wider pixel-text-shadow">
+              Connect Wallet First
+            </h3>
+            <p className="font-orbitron text-pixel-sm text-gray-600 mb-6 uppercase tracking-wide">
+              You need to connect your wallet before you can create teams.
+            </p>
+            <button
+              onClick={onClose}
+              className="w-full bg-gradient-to-r from-sunset-coral to-sky-blue text-white py-3 border-2 border-gray-800 font-pixel font-bold text-pixel-sm hover:shadow-xl transform hover:scale-105 transition-all duration-200 uppercase tracking-wider"
+            >
+              CONNECT WALLET
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if user is a superhero
+  if (!hasSuperheroIdentity) {
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white/95 border-4 border-gray-800 max-w-md w-full shadow-2xl">
+          <div className="flex items-center justify-between p-4 border-b-4 border-gray-800 bg-gradient-to-r from-moss-green to-sky-blue">
+            <div className="flex items-center space-x-3">
+              <Crown className="w-6 h-6 text-white" />
+              <h2 className="font-pixel font-bold text-pixel-lg text-white uppercase tracking-wider">
+                Superhero Required
+              </h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 bg-white/20 border-2 border-white flex items-center justify-center hover:bg-white/30 transition-colors"
+            >
+              <X className="w-4 h-4 text-white" />
+            </button>
+          </div>
+          <div className="p-6 text-center">
+            <div className="w-16 h-16 bg-green-100 border-4 border-green-400 flex items-center justify-center text-3xl mx-auto mb-4">
+              🦸‍♂️
+            </div>
+            <h3 className="font-pixel font-bold text-pixel-xl text-gray-800 mb-3 uppercase tracking-wider pixel-text-shadow">
+              Create Superhero First
+            </h3>
+            <p className="font-orbitron text-pixel-sm text-gray-600 mb-6 uppercase tracking-wide">
+              Only superheroes can create teams. Please create your superhero identity first.
+            </p>
+            <button
+              onClick={onClose}
+              className="w-full bg-gradient-to-r from-sunset-coral to-sky-blue text-white py-3 border-2 border-gray-800 font-pixel font-bold text-pixel-sm hover:shadow-xl transform hover:scale-105 transition-all duration-200 uppercase tracking-wider"
+            >
+              CREATE SUPERHERO
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
-      const newFiles = Array.from(files).map(file => file.name);
+      const newFiles = Array.from(files);
+      const newFileNames = newFiles.map(file => file.name);
       setUploadedFiles(prev => [...prev, ...newFiles]);
       setFormData(prev => ({
         ...prev,
-        projectFiles: [...prev.projectFiles, ...newFiles]
+        projectFiles: [...prev.projectFiles, ...newFileNames]
       }));
     }
   };
@@ -86,45 +182,52 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ isOpen, onClose, onCr
     }));
   };
 
-  const handleSubmit = () => {
-    if (!user) return;
+  const handleSubmit = async () => {
+    if (!isConnected || !address || !hasSuperheroIdentity) return;
 
-    const teamData = {
-      ...formData,
-      leader: {
-        id: parseInt(user.id),
-        name: user.name,
-        avatar: user.avatar,
-        role: 'Team Leader',
-        level: user.level,
-        isLeader: true,
-        stakedTokens: formData.stakeAmount * 2, // Leader stakes double
-      },
-      members: [],
-      createdAt: 'Just now',
-      pixelColor: 'from-green-400 to-emerald-500',
-      isRecruiting: true,
-      isFull: false,
-      contractAddress: `0x${Math.random().toString(16).substr(2, 8)}...${Math.random().toString(16).substr(2, 4)}`,
-    };
+    setIsSubmitting(true);
+    setError(null);
 
-    onCreateTeam(teamData);
-    onClose();
-    
-    // Reset form
-    setFormData({
-      name: '',
-      project: '',
-      description: '',
-      maxMembers: 4,
-      requiredRoles: [],
-      tags: [],
-      requirements: [],
-      stakeAmount: 500,
-      projectFiles: [],
-    });
-    setUploadedFiles([]);
-    setCurrentStep(1);
+    try {
+      const createTeamRequest = {
+        teamName: formData.name,
+        projectName: formData.project,
+        description: formData.description,
+        requiredMembers: formData.maxMembers,
+        requiredStake: formData.stakeAmount,
+        roles: formData.requiredRoles,
+        tags: formData.tags,
+        projectFiles: formData.projectFiles,
+        userAddress: address,
+      };
+
+      // Call the parent's create team handler which includes smart contract integration
+      await onCreateTeam(createTeamRequest, uploadedFiles.length > 0 ? uploadedFiles : undefined);
+      
+      // Close modal and reset form only on success
+      onClose();
+      
+      // Reset form
+      setFormData({
+        name: '',
+        project: '',
+        description: '',
+        maxMembers: 4,
+        requiredRoles: [],
+        tags: [],
+        requirements: [],
+        stakeAmount: 100,
+        projectFiles: [],
+      });
+      setUploadedFiles([]);
+      setCurrentStep(1);
+
+    } catch (err) {
+      console.error('Failed to create team:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create team');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const canProceed = () => {
@@ -193,6 +296,17 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ isOpen, onClose, onCr
 
         {/* Form Content */}
         <div className="p-6">
+          {/* Error Display */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-100 border-2 border-red-400 text-red-700">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5" />
+                <span className="font-orbitron text-pixel-sm uppercase tracking-wide">
+                  {error}
+                </span>
+              </div>
+            </div>
+          )}
           {/* Step 1: Basic Info */}
           {currentStep === 1 && (
             <div className="space-y-6">
@@ -290,7 +404,10 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ isOpen, onClose, onCr
                         <div className="flex items-center space-x-2">
                           <FileText className="w-4 h-4 text-blue-600" />
                           <span className="font-orbitron text-pixel-sm text-blue-700 uppercase tracking-wide">
-                            {file}
+                            {file.name}
+                          </span>
+                          <span className="font-orbitron text-pixel-xs text-blue-500 uppercase tracking-wide">
+                            ({(file.size / 1024).toFixed(1)} KB)
                           </span>
                         </div>
                         <button
@@ -432,7 +549,7 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ isOpen, onClose, onCr
               {/* Staking Amount */}
               <div>
                 <label className="block font-pixel font-bold text-pixel-sm text-gray-800 mb-3 uppercase tracking-wider">
-                  Staking Amount (IDEA Tokens)
+                  Staking Amount (USDC Tokens)
                 </label>
                 <div className="bg-yellow-50 border-2 border-yellow-400 p-4 mb-4">
                   <div className="flex items-center space-x-2 mb-2">
@@ -442,32 +559,32 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ isOpen, onClose, onCr
                     </span>
                   </div>
                   <p className="font-orbitron text-pixel-xs text-yellow-700 uppercase tracking-wide">
-                    Higher stakes attract more committed team members
+                    Higher stakes attract more committed team members (Minimum: 100 USDC)
                   </p>
                 </div>
-                <div className="flex items-center space-x-4">
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, stakeAmount: Math.max(100, prev.stakeAmount - 100) }))}
-                    className="w-10 h-10 bg-red-500 text-white border-2 border-red-700 flex items-center justify-center hover:bg-red-600 transition-colors"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <div className="flex-1 text-center">
-                    <div className="font-pixel font-bold text-pixel-2xl text-gray-800">{formData.stakeAmount}</div>
-                    <div className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">IDEA Tokens</div>
+                <div className="space-y-2">
+                  <input
+                    type="number"
+                    value={formData.stakeAmount}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      stakeAmount: Math.max(100, parseInt(e.target.value) || 100)
+                    }))}
+                    min="100"
+                    max="10000"
+                    step="100"
+                    className="w-full px-4 py-3 bg-white/50 border-2 border-gray-600 font-orbitron text-pixel-sm focus:outline-none focus:border-moss-green pixel-input uppercase tracking-wide text-center"
+                    placeholder="ENTER STAKE AMOUNT..."
+                  />
+                  <div className="text-center">
+                    <span className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">
+                      USDC Tokens (Min: 100, Max: 10000)
+                    </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, stakeAmount: Math.min(2000, prev.stakeAmount + 100) }))}
-                    className="w-10 h-10 bg-green-500 text-white border-2 border-green-700 flex items-center justify-center hover:bg-green-600 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
                 </div>
                 <div className="mt-2 text-center">
                   <span className="font-orbitron text-pixel-xs text-gray-500 uppercase tracking-wide">
-                    As leader, you'll stake {formData.stakeAmount * 2} IDEA tokens
+                    As leader, you'll stake {formData.stakeAmount} USDC tokens
                   </span>
                 </div>
               </div>
@@ -558,7 +675,7 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ isOpen, onClose, onCr
                       </div>
                       <div>
                         <span className="font-pixel text-pixel-sm text-gray-600 uppercase tracking-wider">Stake: </span>
-                        <span className="font-orbitron text-pixel-sm text-gray-800 uppercase tracking-wide">{formData.stakeAmount} IDEA</span>
+                        <span className="font-orbitron text-pixel-sm text-gray-800 uppercase tracking-wide">{formData.stakeAmount} USDC</span>
                       </div>
                     </div>
                   </div>
@@ -663,10 +780,15 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ isOpen, onClose, onCr
             ) : (
               <button
                 onClick={handleSubmit}
-                className="flex items-center space-x-2 bg-gradient-to-r from-sunset-coral to-sky-blue text-white px-8 py-3 border-2 border-gray-800 font-pixel font-bold text-pixel-sm hover:shadow-xl transform hover:scale-105 transition-all duration-200 uppercase tracking-wider"
+                disabled={isSubmitting}
+                className="flex items-center space-x-2 bg-gradient-to-r from-sunset-coral to-sky-blue text-white px-8 py-3 border-2 border-gray-800 font-pixel font-bold text-pixel-sm hover:shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none uppercase tracking-wider"
               >
-                <Sparkles className="w-4 h-4" />
-                <span>CREATE TEAM</span>
+                {isSubmitting ? (
+                  <Loader className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                <span>{isSubmitting ? 'CREATING...' : 'CREATE TEAM'}</span>
               </button>
             )}
           </div>

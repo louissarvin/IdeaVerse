@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Zap, Wallet, Plus, User, LogOut, UserPlus } from 'lucide-react';
-import { useApp } from '../contexts/AppContext';
+import { Menu, X, Zap, Wallet, Plus, User, LogOut, UserPlus, ShoppingBag } from 'lucide-react';
+import { useWallet } from '../contexts/WalletContext';
 import WalletModal from './WalletModal';
 import MintIdeaModal from './MintIdeaModal';
 
@@ -13,7 +13,16 @@ const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isSticky, setIsSticky] = useState(false);
   const location = useLocation();
-  const { user, connectedWallet, disconnectWallet, builders } = useApp();
+  const { isConnected, address, disconnectWallet, hasSuperheroIdentity, superheroName, checkSuperheroIdentity, refreshWalletState } = useWallet();
+  
+  // Debug: Log initial state and changes
+  React.useEffect(() => {
+    console.log('🏠 Header mounted, wallet state:', { isConnected, address });
+  }, []);
+  
+  React.useEffect(() => {
+    console.log('🔄 Header wallet state changed:', { isConnected, address, hasSuperheroIdentity, superheroName });
+  }, [isConnected, address, hasSuperheroIdentity, superheroName]);
 
   // Handle scroll for sticky behavior
   useEffect(() => {
@@ -46,15 +55,36 @@ const Header = () => {
   };
 
   const handleConnectWallet = () => {
+    console.log('🔘 Connect wallet button clicked');
     setIsWalletModalOpen(true);
+    console.log('🔘 Wallet modal should open now');
+  };
+
+  const handleRefreshWallet = async () => {
+    console.log('🔄 Manual wallet refresh triggered');
+    
+    // First, let's see what MetaMask reports right now
+    if (window.ethereum) {
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+        console.log('🔍 MetaMask current state:');
+        console.log('  - Accounts:', accounts);
+        console.log('  - Chain ID:', chainId, '(' + parseInt(chainId, 16) + ')');
+        console.log('  - Selected account:', accounts[0]);
+      } catch (error) {
+        console.error('❌ Failed to query MetaMask:', error);
+      }
+    }
+    
+    await refreshWalletState();
   };
 
   const handleMintIdea = () => {
     setIsMintModalOpen(true);
   };
 
-  // Check if user has superhero identity
-  const userSuperhero = user ? builders.find(builder => builder.name === user.name) : null;
+  // Note: Superhero identity checking can be added later via blockchain queries
 
   return (
     <>
@@ -135,7 +165,7 @@ const Header = () => {
 
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center space-x-2 lg:space-x-4">
-              {user ? (
+              {isConnected ? (
                 <>
                   {/* Mint Button - Compact when sticky */}
                   <button
@@ -150,6 +180,7 @@ const Header = () => {
                     <span>MINT</span>
                   </button>
 
+
                   {/* User Menu - Compact when sticky */}
                   <div className="relative user-menu-container">
                     <button
@@ -161,22 +192,18 @@ const Header = () => {
                       <div className={`bg-gradient-to-br from-sunset-coral to-sky-blue border-2 border-gray-600 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                         isScrolled && isSticky ? 'w-6 h-6 text-xs' : 'w-8 h-8 text-sm'
                       }`}>
-                        {typeof user.avatar === 'string' && user.avatar.startsWith('data:') ? (
-                          <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                          user.avatar
-                        )}
+                        🦸‍♂️
                       </div>
                       <div className="text-left hidden lg:block">
                         <div className={`font-pixel font-bold text-gray-800 uppercase tracking-wider ${
                           isScrolled && isSticky ? 'text-pixel-xs' : 'text-pixel-xs'
                         }`}>
-                          {user.name}
+                          {hasSuperheroIdentity && superheroName ? superheroName : (address ? `${address.slice(0,6)}...${address.slice(-4)}` : 'Connected')}
                         </div>
                         <div className={`font-orbitron text-gray-600 uppercase tracking-wide ${
                           isScrolled && isSticky ? 'text-pixel-xs' : 'text-pixel-xs'
                         }`}>
-                          {userSuperhero ? '✅ Superhero' : '⚠️ No Identity'}
+                          {hasSuperheroIdentity ? '🦸‍♂️ Superhero' : '🔗 Wallet Connected'}
                         </div>
                       </div>
                     </button>
@@ -189,61 +216,30 @@ const Header = () => {
                         <div className="p-4 border-b-2 border-gray-600">
                           <div className="flex items-center space-x-3 mb-3">
                             <div className="w-12 h-12 bg-gradient-to-br from-sunset-coral to-sky-blue border-2 border-gray-600 flex items-center justify-center text-lg overflow-hidden">
-                              {typeof user.avatar === 'string' && user.avatar.startsWith('data:') ? (
-                                <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
-                              ) : (
-                                user.avatar
-                              )}
+                              🦸‍♂️
                             </div>
                             <div>
-                              <div className="font-pixel font-bold text-pixel-sm text-gray-800 uppercase tracking-wider">{user.name}</div>
-                              <div className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">{user.username}</div>
+                              <div className="font-pixel font-bold text-pixel-sm text-gray-800 uppercase tracking-wider">
+                                {hasSuperheroIdentity && superheroName ? superheroName : (address ? `${address.slice(0,8)}...${address.slice(-6)}` : 'Connected')}
+                              </div>
+                              <div className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">
+                                {hasSuperheroIdentity ? '🦸‍♂️ Superhero' : '🔗 Wallet Connected'}
+                              </div>
                             </div>
                           </div>
                           
                           {/* Identity Status */}
-                          {userSuperhero ? (
-                            <div className="p-2 bg-green-100 border border-green-400 mb-3">
-                              <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-green-600 border border-green-800"></div>
-                                <span className="font-pixel text-pixel-xs text-green-800 uppercase tracking-wider">
-                                  Superhero Identity Active
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="p-2 bg-yellow-100 border border-yellow-400 mb-3">
-                              <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-yellow-600 border border-yellow-800"></div>
-                                <span className="font-pixel text-pixel-xs text-yellow-800 uppercase tracking-wider">
-                                  No Superhero Identity
-                                </span>
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="grid grid-cols-2 gap-2 text-center">
-                            <div className="p-2 bg-blue-100 border border-blue-400">
-                              <div className="font-pixel font-bold text-pixel-sm text-blue-600">L{user.level}</div>
-                              <div className="font-orbitron text-pixel-xs text-gray-600 uppercase">Level</div>
-                            </div>
-                            <div className="p-2 bg-yellow-100 border border-yellow-400">
-                              <div className="font-pixel font-bold text-pixel-sm text-yellow-600">{user.reputation}</div>
-                              <div className="font-orbitron text-pixel-xs text-gray-600 uppercase">Rep</div>
+                          <div className={`p-2 border mb-3 ${hasSuperheroIdentity ? 'bg-green-100 border-green-400' : 'bg-blue-100 border-blue-400'}`}>
+                            <div className="flex items-center space-x-2">
+                              <div className={`w-2 h-2 border ${hasSuperheroIdentity ? 'bg-green-600 border-green-800' : 'bg-blue-600 border-blue-800'}`}></div>
+                              <span className={`font-pixel text-pixel-xs uppercase tracking-wider ${hasSuperheroIdentity ? 'text-green-800' : 'text-blue-800'}`}>
+                                {hasSuperheroIdentity ? 'Superhero Identity' : 'Wallet Connected'}
+                              </span>
                             </div>
                           </div>
                         </div>
                         <div className="p-2 space-y-2">
-                          {userSuperhero ? (
-                            <Link
-                              to={`/profile/${userSuperhero.id}`}
-                              onClick={() => setIsUserMenuOpen(false)}
-                              className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-blue-100 border border-blue-400 font-pixel text-pixel-xs text-blue-600 uppercase tracking-wider"
-                            >
-                              <User className="w-4 h-4" />
-                              <span>VIEW PROFILE</span>
-                            </Link>
-                          ) : (
+                          {!hasSuperheroIdentity && (
                             <Link
                               to="/create-superhero"
                               onClick={() => setIsUserMenuOpen(false)}
@@ -253,6 +249,37 @@ const Header = () => {
                               <span>CREATE IDENTITY</span>
                             </Link>
                           )}
+                          {hasSuperheroIdentity && (
+                            <Link
+                              to="/profile/me"
+                              onClick={() => setIsUserMenuOpen(false)}
+                              className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-purple-100 border border-purple-400 font-pixel text-pixel-xs text-purple-600 uppercase tracking-wider"
+                            >
+                              <User className="w-4 h-4" />
+                              <span>VIEW PROFILE</span>
+                            </Link>
+                          )}
+                          
+                          {/* My Purchases Link */}
+                          <Link
+                            to="/my-purchases"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-orange-100 border border-orange-400 font-pixel text-pixel-xs text-orange-600 uppercase tracking-wider"
+                          >
+                            <ShoppingBag className="w-4 h-4" />
+                            <span>MY PURCHASES</span>
+                          </Link>
+                          
+                          <button
+                            onClick={() => {
+                              refreshWalletState();
+                              setIsUserMenuOpen(false);
+                            }}
+                            className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-blue-100 border border-blue-400 font-pixel text-pixel-xs text-blue-600 uppercase tracking-wider"
+                          >
+                            <User className="w-4 h-4" />
+                            <span>REFRESH WALLET</span>
+                          </button>
                           <button
                             onClick={() => {
                               disconnectWallet();
@@ -347,7 +374,7 @@ const Header = () => {
                 </Link>
                 <a href="#roadmap" className="text-gray-700 hover:text-sunset-coral transition-colors font-pixel text-pixel-sm uppercase tracking-wider">Roadmap</a>
                 
-                {user ? (
+                {isConnected ? (
                   <div className="space-y-3 pt-4 border-t-2 border-gray-600">
                     <button
                       onClick={handleMintIdea}
@@ -357,25 +384,14 @@ const Header = () => {
                       <span>MINT IDEA</span>
                     </button>
                     
-                    {userSuperhero ? (
-                      <Link
-                        to={`/profile/${userSuperhero.id}`}
-                        className="flex items-center space-x-2 bg-sky-blue text-white px-4 py-2 border-2 border-blue-700 font-pixel text-pixel-sm font-bold w-fit uppercase tracking-wider"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        <User className="w-4 h-4" />
-                        <span>VIEW PROFILE</span>
-                      </Link>
-                    ) : (
-                      <Link
-                        to="/create-superhero"
-                        className="flex items-center space-x-2 bg-yellow-500 text-white px-4 py-2 border-2 border-yellow-700 font-pixel text-pixel-sm font-bold w-fit uppercase tracking-wider"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        <span>CREATE IDENTITY</span>
-                      </Link>
-                    )}
+                    <Link
+                      to="/create-superhero"
+                      className="flex items-center space-x-2 bg-yellow-500 text-white px-4 py-2 border-2 border-yellow-700 font-pixel text-pixel-sm font-bold w-fit uppercase tracking-wider"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>CREATE IDENTITY</span>
+                    </Link>
                     
                     <button
                       onClick={() => {

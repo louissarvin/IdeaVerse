@@ -1,0 +1,39 @@
+{
+  "name": "idea-marketplace-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Idea Marketplace with NFT operations",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ponder dev",
+    "dev:indexer": "ponder dev",
+    "dev:api": "tsx watch api-server.ts",
+    "dev:api-old": "tsx watch src/index.ts",
+    "build": "ponder build",
+    "start": "ponder start",
+    "test": "vitest",
+    "deploy": "wrangler deploy",
+    "codegen": "ponder codegen"
+  },
+  "dependencies": {
+   "hono": "^4.0.0",
+   "@hono/node-server": "^1.15.0",
+  "@hono/zod-validator": "^0.2.0",
+    "pinata": "^1.0.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "ethers": "^5.7.2",
+    "zod": "^3.22.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.0",
+    "@ponder/core": "^0.4.0",
+    "viem": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/cors": "^2.8.17",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0",
+    "wrangler": "^3.19.0"
+  },
+  "type": "module"
+}

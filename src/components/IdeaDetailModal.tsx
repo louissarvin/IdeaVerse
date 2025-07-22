@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, Heart, Eye, DollarSign, Lock, Unlock, Star, User, Calendar, FileText } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
+import { useWallet } from '../contexts/WalletContext';
+import { useToast } from '../contexts/ToastContext';
+import IdeaContentModal from './IdeaContentModal';
 
 interface Idea {
   id: number;
+  backendId?: number;
   title: string;
   description: string;
   creator: string;
@@ -30,17 +34,41 @@ interface IdeaDetailModalProps {
 }
 
 const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({ idea, isOpen, onClose }) => {
-  const { likeIdea, purchaseIdea, user } = useApp();
+  const { likeIdea, purchaseIdea } = useApp();
+  const { isConnected, address } = useWallet();
+  const { showSuccess, showError, showInfo } = useToast();
+  const [isContentModalOpen, setIsContentModalOpen] = useState(false);
 
   if (!isOpen || !idea) return null;
+
+  // Debug logging
+  console.log(`🔍 IdeaDetailModal - Idea ${idea.id} ownership status:`, {
+    isOwned: idea.isOwned,
+    isSold: idea.isSold,
+    title: idea.title
+  });
 
   const handleLike = () => {
     likeIdea(idea.id);
   };
 
-  const handlePurchase = () => {
-    if (user) {
-      purchaseIdea(idea.id);
+  const handlePurchase = async () => {
+    if (isConnected && address) {
+      // Show info toast when purchase starts
+      showInfo('Processing Purchase', 'Checking wallet balance and initiating purchase...');
+      
+      try {
+        await purchaseIdea(idea.id);
+        // If we get here without error, show success toast
+        showSuccess(
+          'Purchase Successful!', 
+          `You now own "${idea.title}"! Check "My Purchases" to access the content.`
+        );
+      } catch (error) {
+        // Show error toast for any purchase failures
+        const errorMessage = error instanceof Error ? error.message : 'Purchase failed';
+        showError('Purchase Failed', errorMessage);
+      }
     }
   };
 
@@ -153,17 +181,28 @@ const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({ idea, isOpen, onClose
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  {idea.isOwned ? (
-                    <button className="w-full bg-green-600 text-white py-3 border-2 border-green-800 font-pixel font-bold text-pixel-sm uppercase tracking-wider">
-                      ✅ OWNED
-                    </button>
+                  {idea.isOwned || idea.isSold ? (
+                    <div className="space-y-2">
+                      <button 
+                        onClick={() => setIsContentModalOpen(true)}
+                        className="w-full bg-blue-600 text-white py-3 border-2 border-blue-800 font-pixel font-bold text-pixel-sm hover:bg-blue-700 transition-all duration-200 uppercase tracking-wider flex items-center justify-center space-x-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        <span>VIEW CONTENT</span>
+                      </button>
+                      <div className="text-center">
+                        <span className="inline-block bg-green-600 text-white px-3 py-1 border border-green-800 font-pixel text-pixel-xs uppercase tracking-wider">
+                          ✅ OWNED
+                        </span>
+                      </div>
+                    </div>
                   ) : (
                     <button
                       onClick={handlePurchase}
-                      disabled={!user}
+                      disabled={!isConnected}
                       className="w-full bg-moss-green text-white py-3 border-2 border-green-700 font-pixel font-bold text-pixel-sm hover:bg-green-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider"
                     >
-                      {user ? 'PURCHASE IDEA' : 'CONNECT WALLET'}
+                      {isConnected ? 'PURCHASE IDEA' : 'CONNECT WALLET'}
                     </button>
                   )}
                   
@@ -256,6 +295,16 @@ const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({ idea, isOpen, onClose
           </div>
         </div>
       </div>
+      
+      {/* Content Modal */}
+      {idea && (
+        <IdeaContentModal
+          ideaId={idea.backendId || idea.id}
+          ideaTitle={idea.title}
+          isOpen={isContentModalOpen}
+          onClose={() => setIsContentModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 interface User {
   id: string;
@@ -87,14 +87,20 @@ interface AppContextType {
   builders: Builder[];
   builderRatings: BuilderRating[];
   connectedWallet: boolean;
+  isLoading: boolean;
+  error: string | null;
   connectWallet: () => void;
   disconnectWallet: () => void;
   likeIdea: (ideaId: number) => void;
-  purchaseIdea: (ideaId: number) => void;
+  purchaseIdea: (ideaId: number) => Promise<void>;
   mintNewIdea: (idea: Omit<Idea, 'id' | 'likes' | 'views' | 'createdAt'>) => void;
   rateBuilder: (builderId: number, rating: number, review?: string) => void;
   getBuilderRating: (builderId: number) => number;
   createSuperhero: (data: SuperheroData) => Promise<Builder>;
+  loadBuilders: () => Promise<void>;
+  refreshData: () => Promise<void>;
+  refreshIdeas: () => Promise<void>;
+  refreshPurchaseHistory: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -363,10 +369,12 @@ const initialIdeas: Idea[] = [
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [ideas, setIdeas] = useState<Idea[]>(initialIdeas);
+  const [ideas, setIdeas] = useState<Idea[]>([]); // Start empty, load from API
   const [builders, setBuilders] = useState<Builder[]>(initialBuilders);
   const [builderRatings, setBuilderRatings] = useState<BuilderRating[]>([]);
   const [connectedWallet, setConnectedWallet] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const connectWallet = () => {
     // Simulate wallet connection
@@ -400,23 +408,243 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     ));
   };
 
-  const purchaseIdea = (ideaId: number) => {
-    if (!user) return;
-    
-    setIdeas(prev => prev.map(idea => 
-      idea.id === ideaId 
-        ? { 
-            ...idea, 
-            isOwned: true,
-            isSold: true,
-            soldDate: 'Just now',
-            soldPrice: idea.price
+  const purchaseIdea = async (ideaId: number): Promise<void> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Import web3Service and ApiService dynamically to avoid circular imports
+      const { web3Service } = await import('../services/web3');
+      const { ApiService } = await import('../services/api');
+
+      // Ensure Web3 provider is connected
+      let currentAddress;
+      
+      try {
+        currentAddress = await web3Service.getAccount();
+      } catch (error) {
+        console.log('🔌 Web3Service not initialized, attempting to connect...');
+      }
+      
+      // If web3Service doesn't have an address, try to connect it
+      if (!currentAddress) {
+        try {
+          console.log('🔌 Connecting web3Service...');
+          const connectionResult = await web3Service.connectWallet();
+          currentAddress = connectionResult.address;
+          console.log('✅ Web3Service connected:', currentAddress);
+          
+          // Wait a moment for provider to fully initialize
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (connectError) {
+          console.error('❌ Failed to connect web3Service:', connectError);
+          throw new Error('Failed to initialize wallet connection for purchase. Please try refreshing the page.');
+        }
+      }
+
+      if (!currentAddress) {
+        throw new Error('Wallet connection failed');
+      }
+
+      console.log(`💰 Wallet connected: ${currentAddress}`);
+      
+      // Add a simple USDC balance check first with retry logic
+      let usdcBalance;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount < maxRetries) {
+        try {
+          usdcBalance = await web3Service.getUSDCBalance(currentAddress);
+          break; // Success, exit retry loop
+        } catch (balanceError: any) {
+          retryCount++;
+          console.warn(`⚠️ USDC balance check attempt ${retryCount} failed:`, balanceError.message);
+          
+          if (balanceError.message.includes('Provider not initialized') && retryCount < maxRetries) {
+            // Wait before retry and try to reinitialize
+            console.log('🔄 Retrying balance check after provider reinitialization...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Try to reconnect if provider is not initialized
+            try {
+              await web3Service.connectWallet();
+            } catch (reconnectError) {
+              console.warn('Failed to reconnect during retry:', reconnectError);
+            }
+          } else {
+            // Final attempt failed or different error
+            if (balanceError.message.includes('Provider not initialized')) {
+              throw new Error('Wallet connection issue. Please disconnect and reconnect your wallet, then try again.');
+            }
+            throw balanceError;
           }
-        : idea
-    ));
-    
-    // Simulate balance deduction
-    setUser(prev => prev ? { ...prev, balance: prev.balance - parseFloat(ideas.find(i => i.id === ideaId)?.price.split(' ')[0] || '0') } : null);
+        }
+      }
+      
+      if (retryCount >= maxRetries) {
+        throw new Error('Failed to connect to wallet after multiple attempts. Please disconnect and reconnect your wallet.');
+      }
+      
+      console.log(`💳 Current USDC balance: ${usdcBalance} USDC`);
+      
+      if (parseFloat(usdcBalance) === 0) {
+        // Auto-mint USDC for testing since this is a test environment
+        setError('Minting test USDC tokens...');
+        try {
+          await web3Service.mintUSDC('10000', currentAddress);
+          setError('USDC minted! Proceeding with purchase...');
+          console.log(`✅ Minted 10,000 USDC tokens to ${currentAddress}`);
+        } catch (mintError: any) {
+          throw new Error(`Failed to mint USDC tokens: ${mintError.message}`);
+        }
+      }
+
+      console.log(`🔍 Looking for idea with ID: ${ideaId}`);
+      console.log(`📋 Available ideas:`, ideas.map(i => ({ id: i.id, title: i.title })));
+      
+      const idea = ideas.find(i => i.id === ideaId);
+      if (!idea) {
+        throw new Error(`Idea not found. Looking for ID: ${ideaId}, Available IDs: ${ideas.map(i => i.id).join(', ')}`);
+      }
+
+      // Extract price value (remove 'USDC' suffix)
+      const priceStr = idea.price.replace(' USDC', '').replace(' ETH', '');
+      const priceAmount = parseFloat(priceStr);
+
+      if (isNaN(priceAmount)) {
+        throw new Error('Invalid price format');
+      }
+
+      console.log(`💰 Starting purchase process for idea ${ideaId} at ${priceAmount} USDC`);
+
+      // Step 1: Check USDC balance and allowance
+      console.log(`💳 Checking USDC balance and allowance for ${priceAmount} USDC...`);
+      setError('Checking USDC balance...');
+      
+      let usdcStatus;
+      try {
+        usdcStatus = await web3Service.checkUSDCAllowanceAndBalance(priceAmount.toString(), currentAddress);
+        console.log(`💰 USDC Status:`, usdcStatus);
+      } catch (usdcError: any) {
+        console.error('❌ USDC check failed:', usdcError);
+        throw new Error(`Failed to check USDC balance: ${usdcError.message}`);
+      }
+      
+      if (!usdcStatus.hasBalance) {
+        throw new Error(`Insufficient USDC balance. You have ${usdcStatus.balance} USDC but need ${priceAmount} USDC`);
+      }
+
+      // Step 2: Approve USDC if needed
+      if (usdcStatus.needsApproval) {
+        console.log(`🔓 Approving ${priceAmount} USDC for marketplace...`);
+        setError('Please approve USDC spending in your wallet...');
+        
+        try {
+          const approvalTxHash = await web3Service.approveUSDC(priceAmount.toString());
+          console.log(`✅ USDC approved: ${approvalTxHash}`);
+          setError('USDC approved! Processing purchase...');
+          
+          // Wait a moment for the approval to be confirmed
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (approvalError: any) {
+          console.error('❌ USDC approval failed:', approvalError);
+          throw new Error(`Failed to approve USDC spending: ${approvalError.message}. Please try again.`);
+        }
+      }
+
+      // Step 3: Execute purchase via smart contract
+      console.log(`🛒 Executing purchase for idea ${ideaId} via smart contract...`);
+      setError('Processing purchase on blockchain...');
+      
+      let transactionHash;
+      try {
+        transactionHash = await web3Service.buyIdea(ideaId);
+        console.log(`✅ Purchase successful! Transaction hash: ${transactionHash}`);
+      } catch (purchaseError: any) {
+        console.error('❌ Smart contract purchase failed:', purchaseError);
+        throw new Error(`Purchase failed: ${purchaseError.message}`);
+      }
+
+      // Log transaction details for verification
+      console.log(`🔗 Blockchain transaction: https://sepolia-blockscout.lisk.com/tx/${transactionHash}`);
+      console.log(`💰 Price: ${priceAmount} USDC`);
+      console.log(`👤 Buyer: ${currentAddress}`);
+      console.log(`🧑‍💼 Idea: ${idea.title} (ID: ${ideaId})`);
+
+      // Record the purchase for future purchase history
+      try {
+        await ApiService.recordPurchase({
+          ideaId,
+          buyer: currentAddress,
+          seller: idea.creator || 'Unknown',
+          price: priceAmount.toString(),
+          transactionHash,
+          timestamp: new Date().toISOString()
+        });
+        console.log(`📝 Purchase recorded in system`);
+      } catch (recordError) {
+        console.warn('Failed to record purchase:', recordError);
+        // Don't fail the entire purchase for this
+      }
+
+      // Step 4: Retrieve and decrypt content
+      console.log(`🔓 Retrieving purchased content...`);
+      setError('Decrypting content...');
+      
+      try {
+        const contentResponse = await ApiService.getIdeaContent(ideaId, currentAddress);
+        if (contentResponse.success) {
+          console.log(`✅ Content decrypted successfully for idea ${ideaId}`);
+          
+          // Clear error state on success
+          setError(null);
+          console.log(`🎉 Purchase successful! Transaction: ${transactionHash}`);
+          console.log(`📍 User can now access content in MY PURCHASES or through VIEW CONTENT button`);
+        } else {
+          console.warn('Content retrieval failed, but purchase was successful');
+        }
+      } catch (contentError) {
+        console.warn('Content decryption failed:', contentError);
+        // Don't fail the entire purchase for content issues
+      }
+
+      // Step 5: Update UI state
+      setIdeas(prev => {
+        const updatedIdeas = prev.map(ideaItem => 
+          ideaItem.id === ideaId 
+            ? { 
+                ...ideaItem, 
+                isOwned: true,
+                isSold: true,
+                soldDate: 'Just now',
+                soldPrice: `${priceAmount} USDC`
+              }
+            : ideaItem
+        );
+        
+        console.log(`🔄 Updated idea ${ideaId} ownership status:`, 
+          updatedIdeas.find(i => i.id === ideaId)?.isOwned
+        );
+        
+        return updatedIdeas;
+      });
+      
+      // Refresh user data to update balance
+      await refreshData();
+      
+      console.log(`🎉 Purchase process completed for idea ${ideaId}`);
+
+    } catch (error) {
+      console.error('Purchase failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to purchase idea';
+      setError(errorMessage);
+      
+      // Re-throw error so UI can handle it with toast
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const mintNewIdea = (newIdea: Omit<Idea, 'id' | 'likes' | 'views' | 'createdAt'>) => {
@@ -542,6 +770,208 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return newSuperhero;
   };
 
+  const loadBuilders = async (): Promise<void> => {
+    try {
+      console.log('🔄 Loading builders from API...');
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await fetch('http://localhost:3002/superheroes');
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        console.log(`📊 Found ${result.data.length} superheroes from API`);
+        
+        // Transform API superhero data to Builder format
+        const transformedBuilders: Builder[] = result.data.map((superhero: any, index: number) => {
+          // Parse hex-encoded name and bio
+          const name = superhero.name && superhero.name.startsWith('0x') ? 
+            parseHexString(superhero.name) : superhero.name || `Superhero ${superhero.superhero_id}`;
+          const bio = superhero.bio && superhero.bio.startsWith('0x') ? 
+            parseHexString(superhero.bio) : (superhero.bio || 'A superhero builder');
+          
+          // Parse skills and specialties if they exist
+          const skills = Array.isArray(superhero.skills) ? superhero.skills : [];
+          const specialties = Array.isArray(superhero.specialities) ? superhero.specialities : [];
+          
+          // Get avatar URL from IPFS or fallback to emoji
+          const avatarUrl = superhero.avatar_url ? 
+            (superhero.avatar_url.startsWith('ipfs://') ? 
+              `https://gateway.pinata.cloud/ipfs/${superhero.avatar_url.replace('ipfs://', '')}` : 
+              superhero.avatar_url
+            ) : null;
+          
+          return {
+            id: superhero.superhero_id || index + 1,
+            name: name,
+            username: `@${(name || `hero${superhero.superhero_id}`).toLowerCase().replace(/\s+/g, '')}`,
+            avatar: avatarUrl || '🦸‍♂️', // Use IPFS URL or fallback to emoji
+            level: Math.floor((superhero.reputation || 0) / 100) + 1,
+            reputation: superhero.reputation || 0,
+            specialties: specialties.length > 0 ? specialties : ['Blockchain', 'Web3'],
+            achievements: ['Blockchain Pioneer', 'Builder'],
+            teamsFormed: 0,
+            ideasMinted: 0,
+            bgGradient: `from-${['blue', 'green', 'purple', 'orange', 'pink'][index % 5]}-400/20 to-${['purple', 'blue', 'indigo', 'red', 'yellow'][index % 5]}-500/20`,
+            location: 'Decentralized',
+            joinedDate: superhero.created_at ? 
+              new Date(typeof superhero.created_at === 'string' ? superhero.created_at : superhero.created_at * 1000).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) :
+              new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+            bio: bio,
+            skills: skills.length > 0 ? skills : ['Smart Contracts', 'DeFi', 'NFTs'],
+            currentProjects: Math.floor(Math.random() * 3),
+            followers: Math.floor(Math.random() * 500),
+            following: Math.floor(Math.random() * 200),
+            isOnline: Math.random() > 0.3,
+            featured: index < 3, // First 3 are featured
+            pixelColor: `from-${['blue', 'green', 'purple', 'orange', 'pink'][index % 5]}-400 to-${['purple', 'blue', 'indigo', 'red', 'yellow'][index % 5]}-500`,
+            rating: 0, // Initialize with 0, will be loaded from rating system
+            totalRatings: 0, // Initialize with 0, will be loaded from rating system
+          };
+        });
+        
+        console.log(`✅ Transformed ${transformedBuilders.length} builders`);
+        setBuilders(transformedBuilders);
+      } else {
+        console.warn('⚠️ Failed to load builders from API, using fallback data');
+        setBuilders(initialBuilders);
+      }
+    } catch (error) {
+      console.error('❌ Failed to load builders from API:', error);
+      console.log('🔄 Falling back to mock builders data...');
+      setBuilders(initialBuilders);
+      setError('Failed to connect to backend. Showing demo data.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Helper function to parse hex-encoded strings
+  const parseHexString = (hexString: string): string => {
+    try {
+      if (!hexString.startsWith('0x')) return hexString;
+      
+      const hex = hexString.slice(2);
+      let str = '';
+      for (let i = 0; i < hex.length; i += 2) {
+        const charCode = parseInt(hex.substr(i, 2), 16);
+        if (charCode !== 0) { // Skip null bytes
+          str += String.fromCharCode(charCode);
+        }
+      }
+      return str.trim() || hexString;
+    } catch (e) {
+      console.warn('Failed to parse hex string:', hexString, e);
+      return hexString;
+    }
+  };
+
+  const refreshData = async (): Promise<void> => {
+    // Placeholder for refresh functionality
+    console.log('Refreshing data...');
+  };
+
+  const refreshIdeas = async (): Promise<void> => {
+    try {
+      console.log('🔄 Refreshing ideas from backend...');
+      setIsLoading(true);
+      setError(null);
+      
+      // Load ideas from backend API
+      const ideasResponse = await fetch('http://localhost:3002/ideas?page=1&limit=50&available=false');
+      const ideasResult = await ideasResponse.json();
+      
+      if (ideasResult.success && ideasResult.data) {
+        console.log('✅ Loaded', ideasResult.data.length, 'ideas from backend');
+        
+        // Convert API ideas to local format for display
+        const apiIdeas = ideasResult.data.map((apiIdea: any, index: number) => {
+          // Parse hex-encoded title if needed
+          const title = apiIdea.title?.startsWith('0x') ? 
+            parseHexString(apiIdea.title) : 
+            apiIdea.title;
+          
+          return {
+            id: parseInt(apiIdea.ideaId || apiIdea.idea_id) || (1000 + index + Date.now() % 1000),
+            backendId: parseInt(apiIdea.ideaId || apiIdea.idea_id), // Store original backend ID for API calls
+            title: title || 'Untitled Idea',
+            description: apiIdea.description || 'No description provided',
+            creator: apiIdea.creatorName || apiIdea.creator || 'Unknown Creator',
+            avatar: '🦸‍♂️', // Default avatar - we'll improve this with actual superhero avatars
+            price: typeof apiIdea.price === 'string' ? `${apiIdea.price} USDC` : `${(apiIdea.price / 1000000).toFixed(2)} USDC`,
+            likes: parseInt(apiIdea.ratingTotal || apiIdea.rating_total) || 0,
+            views: Math.floor(Math.random() * 1000) + 100,
+            isLocked: apiIdea.isPurchased || apiIdea.is_purchased,
+            category: apiIdea.categories?.[0] || apiIdea.category?.[0] || 'General',
+            tags: apiIdea.categories || apiIdea.category || ['General'],
+            categories: apiIdea.categories || apiIdea.category || ['General'],
+            createdAt: apiIdea.createdAt ? new Date(apiIdea.createdAt).toLocaleDateString() : 'Recently',
+            featured: !(apiIdea.isPurchased || apiIdea.is_purchased),
+            pixelColor: 'from-blue-400 to-purple-500',
+            isSold: apiIdea.isPurchased || apiIdea.is_purchased,
+            isLiked: false,
+            isOwned: false
+          };
+        });
+        
+        console.log('📋 Formatted ideas:', apiIdeas);
+        setIdeas(apiIdeas);
+        
+      } else {
+        console.log('⚠️ No ideas found in backend response');
+        setIdeas([]); // Clear ideas if API returns empty
+      }
+    } catch (error) {
+      console.error('❌ Failed to refresh ideas from backend:', error);
+      console.log('🔄 Falling back to mock ideas data...');
+      
+      // Use mock ideas when backend is unavailable
+      const mockIdeas = [
+        {
+          id: 1,
+          backendId: 1,
+          title: 'Decentralized Social Network',
+          description: 'A revolutionary social platform built on blockchain technology that gives users full control over their data.',
+          creator: 'Alex Chen',
+          avatar: '🚀',
+          price: '50.00 USDC',
+          likes: 234,
+          views: 1205,
+          isLocked: false,
+          isSold: false,
+          isOwned: false,
+          category: 'Social',
+          tags: ['Social', 'Blockchain', 'Privacy'],
+          categories: ['Social', 'Blockchain'],
+          createdAt: 'Dec 15',
+          featured: true,
+          pixelColor: 'from-blue-400 to-purple-600',
+        }
+      ];
+      
+      setIdeas(mockIdeas);
+      setError('Failed to connect to backend. Showing demo data.');
+      console.log('✅ Loaded mock ideas successfully');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshPurchaseHistory = async (): Promise<void> => {
+    // Placeholder for refresh purchase history functionality
+    console.log('Refreshing purchase history...');
+  };
+
+  // Load initial data when component mounts
+  useEffect(() => {
+    const loadInitialData = async () => {
+      console.log('🚀 Loading initial data...');
+      await refreshIdeas();
+    };
+    
+    loadInitialData();
+  }, []); // Empty dependency array means this runs once on mount
+
   return (
     <AppContext.Provider value={{
       user,
@@ -549,6 +979,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       builders,
       builderRatings,
       connectedWallet,
+      isLoading,
+      error,
       connectWallet,
       disconnectWallet,
       likeIdea,
@@ -557,6 +989,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       rateBuilder,
       getBuilderRating,
       createSuperhero,
+      loadBuilders,
+      refreshData,
+      refreshIdeas,
+      refreshPurchaseHistory,
     }}>
       {children}
     </AppContext.Provider>
