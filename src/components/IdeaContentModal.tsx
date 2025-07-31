@@ -170,7 +170,7 @@ const IdeaContentModal: React.FC<IdeaContentModalProps> = ({ ideaId, ideaTitle, 
                 {/* Raw Data (for debugging) */}
                 {process.env.NODE_ENV === 'development' && (
                   <div className="mt-6 pt-4 border-t border-gray-300">
-                    <h4 className="font-pixel font-bold text-pixel-xs text-gray-500 mb-2 uppercase tracking-wider">Debug Info</h4>
+                    <h4 className="font-pixel font-bold text-pixel-xs text-gray-500 mb-2 uppercase tracking-wider">Access Content in IPFS :</h4>
                     <pre className="bg-gray-100 p-2 text-xs overflow-auto max-h-40">
                       {JSON.stringify(content, null, 2)}
                     </pre>

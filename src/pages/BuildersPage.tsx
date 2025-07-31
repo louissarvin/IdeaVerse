@@ -120,61 +120,6 @@ const BuildersPage = () => {
             </div>
           </div>
 
-          {/* Data Source Indicator & Refresh Controls */}
-          <div className="pixel-card mb-6">
-            <div className="p-4">
-              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                {/* Data Source Info */}
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <Database className="w-4 h-4 text-blue-600" />
-                    <span className="font-pixel text-pixel-sm text-gray-700 uppercase tracking-wider">
-                      {sortedBuilders.length} Builders Loaded
-                    </span>
-                  </div>
-                  
-                  {error && (
-                    <div className="flex items-center space-x-2 text-orange-600">
-                      <Blocks className="w-4 h-4" />
-                      <span className="font-orbitron text-pixel-xs uppercase tracking-wide">
-                        Using Blockchain Data
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Refresh Controls */}
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleRefresh(false)}
-                    disabled={isLoading || isRefreshing}
-                    className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 border-2 border-blue-700 font-pixel text-pixel-xs hover:bg-blue-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    <span>REFRESH</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleRefresh(true)}
-                    disabled={isLoading || isRefreshing}
-                    className="flex items-center space-x-2 bg-purple-500 text-white px-4 py-2 border-2 border-purple-700 font-pixel text-pixel-xs hover:bg-purple-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider"
-                  >
-                    <Blocks className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    <span>BLOCKCHAIN</span>
-                  </button>
-                </div>
-              </div>
-              
-              {error && (
-                <div className="mt-3 p-3 bg-orange-100 border-2 border-orange-400 text-orange-700">
-                  <p className="font-orbitron text-pixel-xs uppercase tracking-wide">
-                    {error}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Results Summary */}
           <div className="mb-8">
             <h2 className="text-pixel-2xl font-pixel font-bold text-gray-800 mb-2 uppercase tracking-wider pixel-text-shadow">
