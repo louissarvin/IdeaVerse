@@ -68,13 +68,9 @@ export class ContractService {
         this.signer
       );
 
-      console.log('✅ Connected to contracts:', address);
-
       return { address, chainId: network.chainId };
 
     } catch (error: any) {
-      console.error('❌ Contract connection failed:', error);
-      
       if (error.code === 4001) {
         throw new Error('Please connect your wallet to continue.');
       } else if (error.code === -32002) {
@@ -98,7 +94,6 @@ export class ContractService {
       const superheroRole = await this.superheroNFT.SUPERHERO_ROLE();
       return await this.superheroNFT.hasRole(superheroRole, address);
     } catch (error) {
-      console.error('Error checking superhero status:', error);
       return false;
     }
   }
@@ -130,15 +125,6 @@ export class ContractService {
       const categoriesBytes32 = data.categories.map(cat => this.formatBytes32String(cat));
       const priceWei = ethers.utils.parseUnits(data.price.toString(), 6); // USDC has 6 decimals
 
-      console.log('🔗 Creating idea on blockchain...', {
-        title: data.title,
-        titleBytes32,
-        categories: data.categories,
-        categoriesBytes32,
-        ipfsHash: data.ipfsHash,
-        priceWei: priceWei.toString()
-      });
-
       // Call contract
       const tx = await this.ideaRegistry.createIdea(
         titleBytes32,
@@ -147,11 +133,8 @@ export class ContractService {
         priceWei
       );
 
-      console.log('📝 Transaction submitted:', tx.hash);
-
       // Wait for confirmation
       const receipt = await tx.wait();
-      console.log('✅ Transaction confirmed:', receipt.transactionHash);
 
       // Extract idea ID from event logs
       let ideaId: number | undefined;
@@ -160,7 +143,6 @@ export class ContractService {
           const parsedLog = this.ideaRegistry.interface.parseLog(log);
           if (parsedLog.name === 'CreateIdea') {
             ideaId = parsedLog.args.ideaId.toNumber();
-            console.log('🎯 Idea created with ID:', ideaId);
             break;
           }
         } catch (e) {

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useContract } from './useContract';
+import { useWallet } from '../contexts/WalletContext';
 import { BACKEND_API_URL } from '../contracts/config';
 
 interface CreateSuperheroData {
@@ -20,18 +21,16 @@ interface CreateSuperheroResult {
 
 export const useSuperhero = () => {
   const { executeContractMethod, readContractMethod, isLoading: contractLoading, error: contractError } = useContract();
+  const { address } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const uploadToIPFS = useCallback(async (data: CreateSuperheroData) => {
     try {
-      console.log('📄 Uploading to IPFS via backend...');
-      
       let avatarUrl = null;
       
       // Step 1: Upload avatar if provided
       if (data.avatarFile) {
-        console.log('🖼️ Uploading avatar to IPFS...');
         const avatarFormData = new FormData();
         avatarFormData.append('avatar', data.avatarFile);
         
@@ -50,11 +49,9 @@ export const useSuperhero = () => {
         }
         
         avatarUrl = avatarResult.data.ipfsUrl;
-        console.log('✅ Avatar uploaded:', avatarUrl);
       }
       
       // Step 2: Upload metadata JSON to IPFS
-      console.log('📄 Uploading metadata to IPFS...');
       const metadataResponse = await fetch(`${BACKEND_API_URL}/superheroes/upload-metadata`, {
         method: 'POST',
         headers: {
@@ -78,8 +75,6 @@ export const useSuperhero = () => {
         throw new Error(metadataResult.error?.message || 'Metadata upload failed');
       }
       
-      console.log('✅ Metadata uploaded:', metadataResult.data.url);
-      
       return {
         metadataUrl: metadataResult.data.url,
         avatarUrl,
@@ -95,12 +90,9 @@ export const useSuperhero = () => {
 
     try {
       // Step 1: Upload to IPFS via backend
-      console.log('📄 Uploading metadata to IPFS...');
       const { metadataUrl, avatarUrl } = await uploadToIPFS(data);
-      console.log('✅ Metadata uploaded:', metadataUrl);
 
       // Step 2: Check if name is available
-      console.log('🔍 Checking superhero name availability...');
       const nameBytes32 = ethers.utils.formatBytes32String(data.name);
       const isAvailable = await readContractMethod('SuperheroNFT', 'isSuperheroNameAvailable', [nameBytes32]);
       
@@ -114,15 +106,6 @@ export const useSuperhero = () => {
       const bioBytes32 = ethers.utils.formatBytes32String(data.bio);
 
       // Step 4: Execute contract transaction
-      console.log('⛓️ Creating superhero on blockchain...');
-      console.log('📊 Contract arguments:', {
-        nameBytes32,
-        bioBytes32,
-        metadataUrl,
-        skillsBytes32: skillsBytes32.length,
-        specialitiesBytes32: specialitiesBytes32.length
-      });
-      
       const contractCallResult = executeContractMethod('SuperheroNFT', 'createSuperhero', [
         nameBytes32,
         bioBytes32,
@@ -131,17 +114,37 @@ export const useSuperhero = () => {
         specialitiesBytes32
       ]);
       
-      console.log('🔍 Contract call result type:', typeof contractCallResult);
-      console.log('🔍 Contract call result:', contractCallResult);
-      
       if (!contractCallResult || typeof contractCallResult.then !== 'function') {
         throw new Error('Contract method did not return a Promise');
       }
       
       const result = await contractCallResult;
 
-      console.log('✅ Superhero created successfully!');
-      console.log('📊 Contract result:', result);
+      // Step 5: Immediately save to backend database to avoid indexing delays
+      try {
+        const backendResponse = await fetch(`${BACKEND_API_URL}/superheroes/create`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: data.name,
+            bio: data.bio,
+            skills: data.skills,
+            specialities: data.specialities,
+            userAddress: address || '',
+            avatarUrl: avatarUrl,
+          }),
+        });
+
+        if (!backendResponse.ok) {
+          // Don't fail the entire process if backend save fails
+          console.warn('Backend save failed but blockchain transaction succeeded');
+        }
+      } catch (backendError) {
+        // Don't fail the entire process if backend save fails
+        console.warn('Backend save error but blockchain transaction succeeded:', backendError);
+      }
 
       setIsLoading(false);
 
@@ -157,14 +160,13 @@ export const useSuperhero = () => {
       setIsLoading(false);
       throw error;
     }
-  }, [executeContractMethod, readContractMethod, uploadToIPFS]);
+  }, [executeContractMethod, readContractMethod, uploadToIPFS, address]);
 
   const isSuperheroNameAvailable = useCallback(async (name: string): Promise<boolean> => {
     try {
       const nameBytes32 = ethers.utils.formatBytes32String(name);
       return await readContractMethod('SuperheroNFT', 'isSuperheroNameAvailable', [nameBytes32]);
     } catch (error) {
-      console.error('Failed to check name availability:', error);
       return false;
     }
   }, [readContractMethod]);
@@ -194,7 +196,6 @@ export const useSuperhero = () => {
       const superheroRole = await readContractMethod('SuperheroNFT', 'SUPERHERO_ROLE', []);
       return await readContractMethod('SuperheroNFT', 'hasRole', [superheroRole, address]);
     } catch (error) {
-      console.error('Failed to check superhero status:', error);
       return false;
     }
   }, [readContractMethod]);

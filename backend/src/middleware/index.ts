@@ -106,16 +106,11 @@ export const enhancedLogger = async (c: Context, next: Next) => {
   const userAgent = c.req.header('user-agent') || 'unknown';
   const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
   
-  console.log(`📥 ${method} ${path} - ${ip} - ${userAgent}`);
-  
   await next();
   
   const end = Date.now();
   const responseTime = end - start;
   const status = c.res.status;
-  
-  const logLevel = status >= 400 ? '❌' : status >= 300 ? '⚠️' : '✅';
-  console.log(`${logLevel} ${method} ${path} - ${status} - ${responseTime}ms`);
 };
 
 // Error handling middleware
@@ -123,8 +118,6 @@ export const errorHandler = async (c: Context, next: Next) => {
   try {
     await next();
   } catch (error) {
-    console.error('❌ Request error:', error);
-    
     if (error instanceof HTTPException) {
       return error.getResponse();
     }

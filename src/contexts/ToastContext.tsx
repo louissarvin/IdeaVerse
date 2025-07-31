@@ -53,7 +53,6 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       duration
     };
 
-    console.log('🍞 Creating toast:', { type, title, message, duration });
     setToasts(prev => [...prev, newToast]);
   };
 

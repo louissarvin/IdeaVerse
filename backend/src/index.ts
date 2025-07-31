@@ -8,10 +8,6 @@ import { DatabaseService } from '@/services/database';
 import { IPFSService } from '@/services/ipfs';
 import { BlockchainService } from '@/services/blockchain';
 
-// Log indexer startup
-console.log(`🔍 Ponder indexer entry point loaded`);
-console.log(`📊 Initializing services for blockchain event processing...`);
-
 // Initialize services
 const db = new DatabaseService();
 const ipfs = new IPFSService();

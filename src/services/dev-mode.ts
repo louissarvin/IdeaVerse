@@ -10,8 +10,6 @@ export class DevModeService {
     }
     
     // Simulate API response for local testing
-    console.log('🏠 Local Mode: Creating superhero locally', data);
-    
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 1000));
     
@@ -40,8 +38,6 @@ export class DevModeService {
       throw new Error('Dev mode is not enabled');
     }
     
-    console.log('🏠 Local Mode: Creating idea locally', data);
-    
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 1500));
     
@@ -68,8 +64,6 @@ export class DevModeService {
     if (!this.isDevMode) {
       throw new Error('Dev mode is not enabled');
     }
-    
-    console.log('🏠 Local Mode: Creating team locally', data);
     
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 1200));

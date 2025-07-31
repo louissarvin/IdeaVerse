@@ -97,7 +97,7 @@ interface AppContextType {
   rateBuilder: (builderId: number, rating: number, review?: string) => void;
   getBuilderRating: (builderId: number) => number;
   createSuperhero: (data: SuperheroData) => Promise<Builder>;
-  loadBuilders: () => Promise<void>;
+  loadBuilders: (forceBlockchain?: boolean) => Promise<void>;
   refreshData: () => Promise<void>;
   refreshIdeas: () => Promise<void>;
   refreshPurchaseHistory: () => Promise<void>;
@@ -423,21 +423,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       try {
         currentAddress = await web3Service.getAccount();
       } catch (error) {
-        console.log('🔌 Web3Service not initialized, attempting to connect...');
       }
       
       // If web3Service doesn't have an address, try to connect it
       if (!currentAddress) {
         try {
-          console.log('🔌 Connecting web3Service...');
           const connectionResult = await web3Service.connectWallet();
           currentAddress = connectionResult.address;
-          console.log('✅ Web3Service connected:', currentAddress);
           
           // Wait a moment for provider to fully initialize
           await new Promise(resolve => setTimeout(resolve, 100));
         } catch (connectError) {
-          console.error('❌ Failed to connect web3Service:', connectError);
           throw new Error('Failed to initialize wallet connection for purchase. Please try refreshing the page.');
         }
       }
@@ -446,7 +442,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw new Error('Wallet connection failed');
       }
 
-      console.log(`💰 Wallet connected: ${currentAddress}`);
       
       // Add a simple USDC balance check first with retry logic
       let usdcBalance;
@@ -463,7 +458,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           
           if (balanceError.message.includes('Provider not initialized') && retryCount < maxRetries) {
             // Wait before retry and try to reinitialize
-            console.log('🔄 Retrying balance check after provider reinitialization...');
             await new Promise(resolve => setTimeout(resolve, 500));
             
             // Try to reconnect if provider is not initialized
@@ -486,7 +480,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw new Error('Failed to connect to wallet after multiple attempts. Please disconnect and reconnect your wallet.');
       }
       
-      console.log(`💳 Current USDC balance: ${usdcBalance} USDC`);
       
       if (parseFloat(usdcBalance) === 0) {
         // Auto-mint USDC for testing since this is a test environment
@@ -494,14 +487,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         try {
           await web3Service.mintUSDC('10000', currentAddress);
           setError('USDC minted! Proceeding with purchase...');
-          console.log(`✅ Minted 10,000 USDC tokens to ${currentAddress}`);
         } catch (mintError: any) {
           throw new Error(`Failed to mint USDC tokens: ${mintError.message}`);
         }
       }
 
-      console.log(`🔍 Looking for idea with ID: ${ideaId}`);
-      console.log(`📋 Available ideas:`, ideas.map(i => ({ id: i.id, title: i.title })));
       
       const idea = ideas.find(i => i.id === ideaId);
       if (!idea) {
@@ -516,18 +506,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw new Error('Invalid price format');
       }
 
-      console.log(`💰 Starting purchase process for idea ${ideaId} at ${priceAmount} USDC`);
 
       // Step 1: Check USDC balance and allowance
-      console.log(`💳 Checking USDC balance and allowance for ${priceAmount} USDC...`);
       setError('Checking USDC balance...');
       
       let usdcStatus;
       try {
         usdcStatus = await web3Service.checkUSDCAllowanceAndBalance(priceAmount.toString(), currentAddress);
-        console.log(`💰 USDC Status:`, usdcStatus);
       } catch (usdcError: any) {
-        console.error('❌ USDC check failed:', usdcError);
         throw new Error(`Failed to check USDC balance: ${usdcError.message}`);
       }
       
@@ -537,40 +523,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // Step 2: Approve USDC if needed
       if (usdcStatus.needsApproval) {
-        console.log(`🔓 Approving ${priceAmount} USDC for marketplace...`);
         setError('Please approve USDC spending in your wallet...');
         
         try {
           const approvalTxHash = await web3Service.approveUSDC(priceAmount.toString());
-          console.log(`✅ USDC approved: ${approvalTxHash}`);
           setError('USDC approved! Processing purchase...');
           
           // Wait a moment for the approval to be confirmed
           await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (approvalError: any) {
-          console.error('❌ USDC approval failed:', approvalError);
           throw new Error(`Failed to approve USDC spending: ${approvalError.message}. Please try again.`);
         }
       }
 
       // Step 3: Execute purchase via smart contract
-      console.log(`🛒 Executing purchase for idea ${ideaId} via smart contract...`);
       setError('Processing purchase on blockchain...');
       
       let transactionHash;
       try {
         transactionHash = await web3Service.buyIdea(ideaId);
-        console.log(`✅ Purchase successful! Transaction hash: ${transactionHash}`);
       } catch (purchaseError: any) {
-        console.error('❌ Smart contract purchase failed:', purchaseError);
         throw new Error(`Purchase failed: ${purchaseError.message}`);
       }
 
       // Log transaction details for verification
-      console.log(`🔗 Blockchain transaction: https://sepolia-blockscout.lisk.com/tx/${transactionHash}`);
-      console.log(`💰 Price: ${priceAmount} USDC`);
-      console.log(`👤 Buyer: ${currentAddress}`);
-      console.log(`🧑‍💼 Idea: ${idea.title} (ID: ${ideaId})`);
 
       // Record the purchase for future purchase history
       try {
@@ -582,30 +558,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           transactionHash,
           timestamp: new Date().toISOString()
         });
-        console.log(`📝 Purchase recorded in system`);
       } catch (recordError) {
-        console.warn('Failed to record purchase:', recordError);
         // Don't fail the entire purchase for this
       }
 
       // Step 4: Retrieve and decrypt content
-      console.log(`🔓 Retrieving purchased content...`);
       setError('Decrypting content...');
       
       try {
         const contentResponse = await ApiService.getIdeaContent(ideaId, currentAddress);
         if (contentResponse.success) {
-          console.log(`✅ Content decrypted successfully for idea ${ideaId}`);
-          
           // Clear error state on success
           setError(null);
-          console.log(`🎉 Purchase successful! Transaction: ${transactionHash}`);
-          console.log(`📍 User can now access content in MY PURCHASES or through VIEW CONTENT button`);
         } else {
-          console.warn('Content retrieval failed, but purchase was successful');
-        }
+          }
       } catch (contentError) {
-        console.warn('Content decryption failed:', contentError);
         // Don't fail the entire purchase for content issues
       }
 
@@ -623,9 +590,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             : ideaItem
         );
         
-        console.log(`🔄 Updated idea ${ideaId} ownership status:`, 
-          updatedIdeas.find(i => i.id === ideaId)?.isOwned
-        );
         
         return updatedIdeas;
       });
@@ -633,10 +597,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Refresh user data to update balance
       await refreshData();
       
-      console.log(`🎉 Purchase process completed for idea ${ideaId}`);
 
     } catch (error) {
-      console.error('Purchase failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to purchase idea';
       setError(errorMessage);
       
@@ -770,42 +732,43 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return newSuperhero;
   };
 
-  const loadBuilders = async (): Promise<void> => {
+  const loadBuilders = async (forceBlockchain: boolean = false): Promise<void> => {
     try {
-      console.log('🔄 Loading builders from API...');
       setIsLoading(true);
       setError(null);
       
-      const response = await fetch('http://localhost:3002/superheroes');
+      const url = `http://localhost:3002/superheroes${forceBlockchain ? '?force=true' : ''}`;
+      console.log(`Loading builders from: ${url}`);
+      
+      const response = await fetch(url);
       const result = await response.json();
       
       if (result.success && result.data) {
-        console.log(`📊 Found ${result.data.length} superheroes from API`);
+        console.log(`Received ${result.data.length} builders from ${result.debug?.dataSource || 'unknown'} source`);
+        console.log('Sample superhero data:', result.data[0]);
         
         // Transform API superhero data to Builder format
         const transformedBuilders: Builder[] = result.data.map((superhero: any, index: number) => {
           // Parse hex-encoded name and bio
-          const name = superhero.name && superhero.name.startsWith('0x') ? 
+          const name = superhero.name && typeof superhero.name === 'string' && superhero.name.startsWith('0x') ? 
             parseHexString(superhero.name) : superhero.name || `Superhero ${superhero.superhero_id}`;
-          const bio = superhero.bio && superhero.bio.startsWith('0x') ? 
+          const bio = superhero.bio && typeof superhero.bio === 'string' && superhero.bio.startsWith('0x') ? 
             parseHexString(superhero.bio) : (superhero.bio || 'A superhero builder');
           
           // Parse skills and specialties if they exist
           const skills = Array.isArray(superhero.skills) ? superhero.skills : [];
           const specialties = Array.isArray(superhero.specialities) ? superhero.specialities : [];
           
-          // Get avatar URL from IPFS or fallback to emoji
-          const avatarUrl = superhero.avatar_url ? 
-            (superhero.avatar_url.startsWith('ipfs://') ? 
-              `https://gateway.pinata.cloud/ipfs/${superhero.avatar_url.replace('ipfs://', '')}` : 
-              superhero.avatar_url
-            ) : null;
+          // Use the emoji avatar from backend, or fallback to default emoji
+          const avatarEmoji = superhero.avatar_url && typeof superhero.avatar_url === 'string' ? 
+            superhero.avatar_url : '🦸‍♂️';
           
           return {
-            id: superhero.superhero_id || index + 1,
+            id: superhero.superhero_id || superhero.id || index + 1,
             name: name,
             username: `@${(name || `hero${superhero.superhero_id}`).toLowerCase().replace(/\s+/g, '')}`,
-            avatar: avatarUrl || '🦸‍♂️', // Use IPFS URL or fallback to emoji
+            avatar: avatarEmoji, // Use emoji avatar
+            avatarUrl: null, // No URL for emoji
             level: Math.floor((superhero.reputation || 0) / 100) + 1,
             reputation: superhero.reputation || 0,
             specialties: specialties.length > 0 ? specialties : ['Blockchain', 'Web3'],
@@ -827,18 +790,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             pixelColor: `from-${['blue', 'green', 'purple', 'orange', 'pink'][index % 5]}-400 to-${['purple', 'blue', 'indigo', 'red', 'yellow'][index % 5]}-500`,
             rating: 0, // Initialize with 0, will be loaded from rating system
             totalRatings: 0, // Initialize with 0, will be loaded from rating system
+            source: superhero.source || 'unknown', // Track data source
           };
         });
         
-        console.log(`✅ Transformed ${transformedBuilders.length} builders`);
         setBuilders(transformedBuilders);
+        
+        // Show data source info to user
+        if (result.debug?.dataSource) {
+          const sourceMessage = result.debug.dataSource === 'hybrid' 
+            ? `Loaded ${transformedBuilders.length} builders (${result.stats?.databaseCount || 0} from database, ${result.stats?.blockchainCount || 0} from blockchain)`
+            : `Loaded ${transformedBuilders.length} builders from ${result.debug.dataSource}`;
+          
+          console.log(sourceMessage);
+          
+          // Only show error if we had to use fallback
+          if (result.debug.dataSource === 'hybrid' && result.stats?.blockchainCount > result.stats?.databaseCount) {
+            setError(`Database incomplete. Showing all ${transformedBuilders.length} builders from blockchain.`);
+          }
+        }
+        
       } else {
-        console.warn('⚠️ Failed to load builders from API, using fallback data');
+        console.warn('API returned no data, using initial builders');
         setBuilders(initialBuilders);
+        setError('No superhero data available. Showing demo builders.');
       }
     } catch (error) {
-      console.error('❌ Failed to load builders from API:', error);
-      console.log('🔄 Falling back to mock builders data...');
+      console.error('Failed to load builders:', error);
       setBuilders(initialBuilders);
       setError('Failed to connect to backend. Showing demo data.');
     } finally {
@@ -861,19 +839,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
       return str.trim() || hexString;
     } catch (e) {
-      console.warn('Failed to parse hex string:', hexString, e);
       return hexString;
     }
   };
 
   const refreshData = async (): Promise<void> => {
     // Placeholder for refresh functionality
-    console.log('Refreshing data...');
   };
 
   const refreshIdeas = async (): Promise<void> => {
     try {
-      console.log('🔄 Refreshing ideas from backend...');
       setIsLoading(true);
       setError(null);
       
@@ -882,7 +857,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const ideasResult = await ideasResponse.json();
       
       if (ideasResult.success && ideasResult.data) {
-        console.log('✅ Loaded', ideasResult.data.length, 'ideas from backend');
         
         // Convert API ideas to local format for display
         const apiIdeas = ideasResult.data.map((apiIdea: any, index: number) => {
@@ -914,16 +888,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           };
         });
         
-        console.log('📋 Formatted ideas:', apiIdeas);
         setIdeas(apiIdeas);
         
       } else {
-        console.log('⚠️ No ideas found in backend response');
         setIdeas([]); // Clear ideas if API returns empty
       }
     } catch (error) {
-      console.error('❌ Failed to refresh ideas from backend:', error);
-      console.log('🔄 Falling back to mock ideas data...');
       
       // Use mock ideas when backend is unavailable
       const mockIdeas = [
@@ -951,7 +921,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       
       setIdeas(mockIdeas);
       setError('Failed to connect to backend. Showing demo data.');
-      console.log('✅ Loaded mock ideas successfully');
     } finally {
       setIsLoading(false);
     }
@@ -959,13 +928,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const refreshPurchaseHistory = async (): Promise<void> => {
     // Placeholder for refresh purchase history functionality
-    console.log('Refreshing purchase history...');
   };
 
   // Load initial data when component mounts
   useEffect(() => {
     const loadInitialData = async () => {
-      console.log('🚀 Loading initial data...');
       await refreshIdeas();
     };
     

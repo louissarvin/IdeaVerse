@@ -24,7 +24,7 @@ const db = new DatabaseService();
 
 // Middleware
 app.use('*', cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:4000'],
+  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://localhost:4000'],
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
@@ -233,8 +233,6 @@ app.get('/ipfs/:hash/json', async (c) => {
 
 // Global error handler
 app.onError((err, c) => {
-  console.error('❌ Unhandled error:', err);
-  
   return c.json({
     success: false,
     error: {
@@ -248,15 +246,9 @@ app.onError((err, c) => {
 // Start server
 const port = parseInt(process.env.PORT || '3002');
 
-console.log(`🚀 Starting Idea Marketplace Backend API...`);
-console.log(`📡 Server will run on port ${port}`);
-console.log(`🌐 Health check: http://localhost:${port}/health`);
-console.log(`📖 API docs: http://localhost:${port}/`);
-
 serve({
   fetch: app.fetch,
   port: port,
 }, (info) => {
-  console.log(`✅ Server is running on http://localhost:${info.port}`);
-  console.log(`🎯 Ready to handle requests!`);
+  // Server started successfully
 });

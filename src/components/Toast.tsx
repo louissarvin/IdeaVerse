@@ -23,7 +23,6 @@ const Toast: React.FC<ToastProps> = ({
   const [isVisible, setIsVisible] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
 
-  console.log('🍞 Toast rendering:', { id, type, title, message, isVisible, isLeaving });
 
   useEffect(() => {
     // Trigger enter animation

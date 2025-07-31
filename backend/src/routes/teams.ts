@@ -91,7 +91,6 @@ app.post('/create', zValidator('json', createTeamSchema), async (c) => {
     }
 
     // Create team on blockchain
-    console.log('⛓️ Creating team on blockchain...');
     const blockchainResult = await blockchain.createTeam({
       teamName: data.teamName,
       projectName: data.projectName,
@@ -103,7 +102,6 @@ app.post('/create', zValidator('json', createTeamSchema), async (c) => {
       userAddress: data.userAddress
     });
 
-    console.log('✅ Team created on blockchain:', blockchainResult.transactionHash);
 
     // The indexer will automatically pick up the event and save to database
     // Return the transaction details for now
@@ -118,7 +116,6 @@ app.post('/create', zValidator('json', createTeamSchema), async (c) => {
     });
 
   } catch (error) {
-    console.error('❌ Team creation error:', error);
     return c.json({
       success: false,
       error: { 

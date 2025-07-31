@@ -15,7 +15,6 @@ const PurchaseHistoryButton: React.FC = () => {
       return;
     }
     
-    console.log('🔄 Manually refreshing purchase history...');
     await refreshPurchaseHistory();
   };
 

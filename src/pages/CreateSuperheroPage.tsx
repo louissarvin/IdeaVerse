@@ -25,7 +25,7 @@ const avatarOptions = [
 
 const CreateSuperheroPage = () => {
   const navigate = useNavigate();
-  const { isConnected, address, hasSuperheroIdentity, superheroName, checkSuperheroIdentity } = useWallet();
+  const { isConnected, address, hasSuperheroIdentity, superheroName, isCheckingSuperhero } = useWallet();
   const { createSuperhero, isLoading: superheroLoading, error: superheroError } = useSuperhero();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentStep, setCurrentStep] = useState(1);
@@ -46,12 +46,11 @@ const CreateSuperheroPage = () => {
   React.useEffect(() => {
     if (!isConnected) {
       navigate('/');
-    } else if (hasSuperheroIdentity) {
+    } else if (!isCheckingSuperhero && hasSuperheroIdentity) {
       // User already has a superhero identity, redirect to builders page
-      console.log('🦸‍♂️ User already has superhero identity:', superheroName);
       navigate('/builders');
     }
-  }, [isConnected, hasSuperheroIdentity, superheroName, navigate]);
+  }, [isConnected, isCheckingSuperhero, hasSuperheroIdentity, superheroName, navigate]);
 
   if (!isConnected) {
     return (
@@ -63,6 +62,23 @@ const CreateSuperheroPage = () => {
           </h2>
           <p className="font-orbitron text-pixel-sm text-gray-600 uppercase tracking-wide">
             Please connect your wallet to create a superhero profile
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state while checking superhero identity
+  if (isCheckingSuperhero) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-dreamy-gradient">
+        <div className="pixel-card p-8 text-center">
+          <div className="w-16 h-16 border-4 border-yellow-400 border-t-transparent animate-spin rounded-full mx-auto mb-6"></div>
+          <h2 className="text-pixel-2xl font-pixel font-bold text-gray-800 mb-4 uppercase tracking-wider">
+            Checking Identity...
+          </h2>
+          <p className="font-orbitron text-pixel-sm text-gray-600 uppercase tracking-wide">
+            Verifying your superhero status on the blockchain
           </p>
         </div>
       </div>
@@ -218,24 +234,11 @@ const CreateSuperheroPage = () => {
     setErrors({});
 
     try {
-      console.log('🚀 Creating superhero with direct contract interaction...');
-      const result = await createSuperhero(superheroData);
-      
-      console.log('✅ Superhero created successfully!', {
-        transactionHash: result.transactionHash,
-        blockNumber: result.blockNumber,
-        metadataUrl: result.metadataUrl,
-      });
+      await createSuperhero(superheroData);
 
-      // Refresh the superhero identity in the wallet context
-      setTimeout(() => {
-        checkSuperheroIdentity();
-      }, 1000); // Give some time for the indexer to pick up the transaction
-
-      // Navigate to builders page - the indexer will pick up the transaction
+      // Navigate to builders page - the new superhero should appear immediately
       navigate('/builders');
     } catch (error) {
-      console.error('❌ Failed to create superhero:', error);
       setErrors({ submit: error instanceof Error ? error.message : 'Failed to create superhero' });
     } finally {
       setIsSubmitting(false);

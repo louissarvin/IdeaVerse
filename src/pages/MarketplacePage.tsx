@@ -37,30 +37,25 @@ const MarketplacePage = () => {
     
     // Filter out ideas created by current user (creator address matches wallet address)
     if (idea.creator && idea.creator.toLowerCase() === address.toLowerCase()) {
-      console.log(`🚫 Hiding own creation: "${idea.title}" (creator: ${idea.creator})`);
       return false;
     }
     
     // Filter out ideas already purchased by current user
     if (idea.isOwned) {
-      console.log(`🚫 Hiding already owned: "${idea.title}"`);
       return false;
     }
     
     // Filter out locked ideas (unavailable for purchase)
     if (idea.isLocked) {
-      console.log(`🚫 Hiding locked idea: "${idea.title}"`);
       return false;
     }
     
     // Filter out already sold ideas (unless they're available for resale)
     if (idea.isSold) {
-      console.log(`🚫 Hiding sold idea: "${idea.title}"`);
       return false;
     }
     
     // Show available ideas that can be purchased
-    console.log(`✅ Showing purchasable idea: "${idea.title}"`);
     return true;
   });
 
@@ -73,14 +68,6 @@ const MarketplacePage = () => {
       const soldIdeas = ideas.filter(idea => idea.isSold).length;
       const availableIdeas = displayIdeas.length;
       
-      console.log(`📊 Marketplace Filter Stats:`, {
-        totalIdeas: ideas.length,
-        ownCreations,
-        ownedIdeas, 
-        lockedIdeas,
-        soldIdeas,
-        availableForPurchase: availableIdeas
-      });
     }
   }, [ideas, displayIdeas, isConnected, address]);
 

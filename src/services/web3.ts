@@ -117,7 +117,6 @@ export class Web3Service {
         chainId: LISK_SEPOLIA_CONFIG.chainId
       };
     } catch (error) {
-      console.error('Failed to connect wallet:', error);
       throw error;
     }
   }
@@ -170,7 +169,6 @@ export class Web3Service {
       const signer = this.provider.getSigner();
       return await signer.getAddress();
     } catch (error) {
-      console.error('Failed to get account:', error);
       return null;
     }
   }
@@ -213,7 +211,6 @@ export class Web3Service {
       const data = await response.json();
       return data.success && data.data !== null;
     } catch (error) {
-      console.error('Failed to check superhero status:', error);
       return false;
     }
   }
@@ -226,7 +223,6 @@ export class Web3Service {
     try {
       return await this.provider.waitForTransaction(hash);
     } catch (error) {
-      console.error('Failed to wait for transaction:', error);
       return null;
     }
   }
@@ -345,11 +341,9 @@ export class Web3Service {
     const usdcContract = new ethers.Contract(CONTRACT_ADDRESSES.MockUSDC, USDC_ABI, this.signer);
     const amountWei = ethers.utils.parseUnits(amount, 6); // USDC has 6 decimals
     
-    console.log(`🪙 Minting ${amount} USDC to ${targetAddress}...`);
     const tx = await usdcContract.mint(targetAddress, amountWei);
     const receipt = await tx.wait();
     
-    console.log(`✅ USDC minted successfully: ${receipt.transactionHash}`);
     return receipt.transactionHash;
   }
 
@@ -360,11 +354,9 @@ export class Web3Service {
 
     const marketplaceContract = new ethers.Contract(CONTRACT_ADDRESSES.OptimizedMarketplace, MARKETPLACE_ABI, this.signer);
     
-    console.log(`🛒 Purchasing idea ${ideaId} via marketplace contract...`);
     const tx = await marketplaceContract.buyIdea(ideaId);
     const receipt = await tx.wait();
     
-    console.log(`✅ Idea purchased successfully: ${receipt.transactionHash}`);
     return receipt.transactionHash;
   }
 
@@ -390,7 +382,6 @@ export class Web3Service {
         flagged: profile.flagged
       };
     } catch (error) {
-      console.error(`Failed to get superhero profile for ${address}:`, error);
       throw error;
     }
   }
@@ -402,16 +393,12 @@ export class Web3Service {
 
     const superheroContract = new ethers.Contract(CONTRACT_ADDRESSES.SuperheroNFT, SUPERHERO_ABI, this.signer);
     
-    console.log(`📈 Updating reputation for ${superheroAddress} to ${newReputation}...`);
-    
     try {
       const tx = await superheroContract.updateReputation(superheroAddress, newReputation);
       const receipt = await tx.wait();
       
-      console.log(`✅ Reputation updated successfully: ${receipt.transactionHash}`);
       return receipt.transactionHash;
     } catch (error) {
-      console.error('Failed to update reputation:', error);
       throw error;
     }
   }
@@ -427,16 +414,12 @@ export class Web3Service {
 
     const superheroContract = new ethers.Contract(CONTRACT_ADDRESSES.SuperheroNFT, SUPERHERO_ABI, this.signer);
     
-    console.log(`⭐ Rating superhero ${superheroAddress} with ${rating} stars...`);
-    
     try {
       const tx = await superheroContract.rateSuperhero(superheroAddress, rating, comment || '');
       const receipt = await tx.wait();
       
-      console.log(`✅ Superhero rated successfully: ${receipt.transactionHash}`);
       return receipt.transactionHash;
     } catch (error) {
-      console.error('Failed to rate superhero:', error);
       throw error;
     }
   }
@@ -450,15 +433,13 @@ export class Web3Service {
     
     try {
       // Try both methods since there might be two different superhero systems
-      console.log(`🔍 Checking superhero status for ${address} using both methods...`);
       
       // Method 1: Direct isSuperhero function
       let isSuperheroMethod1 = false;
       try {
         isSuperheroMethod1 = await superheroContract.isSuperhero(address);
-        console.log(`📋 Method 1 (isSuperhero): ${isSuperheroMethod1}`);
       } catch (method1Error) {
-        console.warn('Method 1 failed:', method1Error);
+        // Method 1 failed
       }
       
       // Method 2: Role-based hasRole function
@@ -466,9 +447,8 @@ export class Web3Service {
       try {
         const superheroRole = await superheroContract.SUPERHERO_ROLE();
         isSuperheroMethod2 = await superheroContract.hasRole(superheroRole, address);
-        console.log(`📋 Method 2 (hasRole): ${isSuperheroMethod2}`);
       } catch (method2Error) {
-        console.warn('Method 2 failed:', method2Error);
+        // Method 2 failed
       }
       
       // Method 3: Check IdeaRegistry contract (which TeamCore might be using)
@@ -481,23 +461,15 @@ export class Web3Service {
         
         const superheroRole = await ideaRegistryContract.SUPERHERO_ROLE();
         isSuperheroMethod3 = await ideaRegistryContract.hasRole(superheroRole, address);
-        console.log(`📋 Method 3 (IdeaRegistry hasRole): ${isSuperheroMethod3}`);
       } catch (method3Error) {
-        console.warn('Method 3 (IdeaRegistry) failed:', method3Error);
+        // Method 3 (IdeaRegistry) failed
       }
       
       const result = isSuperheroMethod1 || isSuperheroMethod2 || isSuperheroMethod3;
-      console.log(`🎯 Final superhero status: ${result} (SuperheroNFT-Method1: ${isSuperheroMethod1}, SuperheroNFT-Method2: ${isSuperheroMethod2}, IdeaRegistry: ${isSuperheroMethod3})`);
-      
-      // Show warning if there's a mismatch
-      if ((isSuperheroMethod1 || isSuperheroMethod2) && !isSuperheroMethod3) {
-        console.warn('⚠️ MISMATCH DETECTED: You are a superhero in SuperheroNFT but NOT in IdeaRegistry! TeamCore might be checking IdeaRegistry.');
-      }
       
       return result;
       
     } catch (error) {
-      console.error(`Failed to check superhero status for ${address}:`, error);
       return false;
     }
   }
@@ -540,11 +512,8 @@ export class Web3Service {
     const usdcContract = new ethers.Contract(CONTRACT_ADDRESSES.MockUSDC, USDC_ABI, this.signer);
     const stakeAmountWei = ethers.utils.parseUnits(leaderStakeAmount.toString(), 6);
     
-    console.log(`💰 Approving ${leaderStakeAmount} USDC for team creation (leader stake)...`);
     const approveTx = await usdcContract.approve(CONTRACT_ADDRESSES.TeamCore, stakeAmountWei);
     await approveTx.wait();
-    
-    console.log(`🏗️ Creating team "${teamData.teamName}" with ${teamData.requiredMembers} members...`);
     
     try {
       // Convert stake amount to wei format (6 decimals for USDC)
@@ -561,10 +530,8 @@ export class Web3Service {
       );
       const receipt = await tx.wait();
       
-      console.log(`✅ Team created successfully: ${receipt.transactionHash}`);
       return receipt.transactionHash;
     } catch (error) {
-      console.error('Failed to create team:', error);
       throw error;
     }
   }
@@ -578,23 +545,18 @@ export class Web3Service {
     const usdcContract = new ethers.Contract(CONTRACT_ADDRESSES.MockUSDC, USDC_ABI, this.signer);
     const stakeAmountWei = ethers.utils.parseUnits(stakeAmount.toString(), 6);
     
-    console.log(`💰 Approving ${stakeAmount} USDC for team join...`);
     const approveTx = await usdcContract.approve(CONTRACT_ADDRESSES.TeamCore, stakeAmountWei);
     await approveTx.wait();
     
     // Now join the team
     const teamContract = new ethers.Contract(CONTRACT_ADDRESSES.TeamCore, TEAM_CORE_ABI, this.signer);
     
-    console.log(`🤝 Joining team ${teamId}...`);
-    
     try {
       const tx = await teamContract.joinTeam(teamId);
       const receipt = await tx.wait();
       
-      console.log(`✅ Successfully joined team: ${receipt.transactionHash}`);
       return receipt.transactionHash;
     } catch (error) {
-      console.error('Failed to join team:', error);
       throw error;
     }
   }
@@ -624,7 +586,6 @@ export class Web3Service {
         tags: team.tags.map((tag: string) => ethers.utils.parseBytes32String(tag)).filter((t: string) => t !== '')
       };
     } catch (error) {
-      console.error(`Failed to get team details for ${teamId}:`, error);
       throw error;
     }
   }
@@ -640,7 +601,6 @@ export class Web3Service {
       const teamIds = await teamContract.getUserTeams(userAddress);
       return teamIds.map((id: any) => id.toNumber());
     } catch (error) {
-      console.error(`Failed to get user teams for ${userAddress}:`, error);
       return [];
     }
   }
@@ -655,7 +615,6 @@ export class Web3Service {
     try {
       return await teamContract.isTeamMember(teamId, userAddress);
     } catch (error) {
-      console.error(`Failed to check team membership for ${userAddress} in team ${teamId}:`, error);
       return false;
     }
   }
@@ -671,7 +630,6 @@ export class Web3Service {
       const total = await teamContract.totalTeams();
       return total.toNumber();
     } catch (error) {
-      console.error('Failed to get total teams:', error);
       return 0;
     }
   }

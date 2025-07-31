@@ -27,17 +27,15 @@ const IdeaContentModal: React.FC<IdeaContentModalProps> = ({ ideaId, ideaTitle, 
     setError(null);
     
     try {
-      console.log(`🔓 Loading content for idea ${ideaId}...`);
       const response = await ApiService.getIdeaContent(ideaId, address!);
       
       if (response.success) {
         setContent(response.data);
-        console.log('✅ Content loaded:', response.data);
+        
       } else {
         setError(response.error?.message || 'Failed to load content');
       }
     } catch (err) {
-      console.error('❌ Failed to load content:', err);
       setError(err instanceof Error ? err.message : 'Failed to load content');
     } finally {
       setLoading(false);

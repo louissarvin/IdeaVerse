@@ -31,8 +31,6 @@ const ProfilePage = () => {
     
     setLoading(true);
     try {
-      console.log('🔍 Loading current user superhero profile for:', address);
-      
       // Try to get superhero profile from API
       const superheroResponse = await ApiService.getSuperheroByAddress(address);
       
@@ -45,6 +43,7 @@ const ProfilePage = () => {
           name: apiSuperhero.name || superheroName || 'Current User',
           username: `@${(apiSuperhero.name || superheroName || 'user').toLowerCase().replace(/\s+/g, '')}`,
           avatar: apiSuperhero.avatar_url || '🦸‍♂️',
+          avatarUrl: null,
           level: Math.floor((apiSuperhero.reputation || 0) / 100) + 1,
           reputation: apiSuperhero.reputation || 0,
           specialties: Array.isArray(apiSuperhero.specialities) ? apiSuperhero.specialities : ['Blockchain', 'Web3'],
@@ -68,13 +67,10 @@ const ProfilePage = () => {
           totalRatings: 0,
         };
         
-        console.log('✅ Loaded current user superhero profile:', transformedSuperhero);
         setCurrentUserSuperhero(transformedSuperhero);
-      } else {
-        console.log('❌ No superhero profile found for current user');
       }
     } catch (error) {
-      console.error('❌ Failed to load current user superhero profile:', error);
+      // Failed to load superhero profile
     } finally {
       setLoading(false);
     }

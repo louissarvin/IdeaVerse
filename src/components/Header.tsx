@@ -13,15 +13,15 @@ const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isSticky, setIsSticky] = useState(false);
   const location = useLocation();
-  const { isConnected, address, disconnectWallet, hasSuperheroIdentity, superheroName, checkSuperheroIdentity, refreshWalletState } = useWallet();
+  const { isConnected, address, disconnectWallet, hasSuperheroIdentity, superheroName, isCheckingSuperhero, refreshWalletState } = useWallet();
   
   // Debug: Log initial state and changes
   React.useEffect(() => {
-    console.log('🏠 Header mounted, wallet state:', { isConnected, address });
+    
   }, []);
   
   React.useEffect(() => {
-    console.log('🔄 Header wallet state changed:', { isConnected, address, hasSuperheroIdentity, superheroName });
+    
   }, [isConnected, address, hasSuperheroIdentity, superheroName]);
 
   // Handle scroll for sticky behavior
@@ -55,25 +55,25 @@ const Header = () => {
   };
 
   const handleConnectWallet = () => {
-    console.log('🔘 Connect wallet button clicked');
+    
     setIsWalletModalOpen(true);
-    console.log('🔘 Wallet modal should open now');
+    
   };
 
   const handleRefreshWallet = async () => {
-    console.log('🔄 Manual wallet refresh triggered');
+    
     
     // First, let's see what MetaMask reports right now
     if (window.ethereum) {
       try {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-        console.log('🔍 MetaMask current state:');
-        console.log('  - Accounts:', accounts);
-        console.log('  - Chain ID:', chainId, '(' + parseInt(chainId, 16) + ')');
-        console.log('  - Selected account:', accounts[0]);
+        await window.ethereum.request({ method: 'eth_accounts' });
+        await window.ethereum.request({ method: 'eth_chainId' });
+        
+        
+        
+        
       } catch (error) {
-        console.error('❌ Failed to query MetaMask:', error);
+        // Handle error silently
       }
     }
     
@@ -97,17 +97,18 @@ const Header = () => {
           <div className="flex items-center justify-between">
             {/* Logo - Compact when sticky */}
             <Link to="/" className="flex items-center space-x-2 sm:space-x-3">
-              <div className={`bg-sunset-coral border-2 sm:border-4 border-gray-800 flex items-center justify-center animate-pixel-glow transition-all duration-300 ${
-                isScrolled && isSticky ? 'w-8 h-8' : 'w-10 h-10'
-              }`}>
-                <Zap className={`text-white transition-all duration-300 ${
-                  isScrolled && isSticky ? 'w-4 h-4' : 'w-6 h-6'
-                }`} />
-              </div>
+              
+                <img 
+                  src="/logoVerse.png" 
+                  alt="IdeaVerse Logo" 
+                  className={`transition-all duration-300 object-contain ${
+                    isScrolled && isSticky ? 'w-6 h-6' : 'w-12 h-12'
+                  }`}
+                />
               <span className={`font-pixel font-bold text-gray-800 uppercase tracking-wider transition-all duration-300 ${
                 isScrolled && isSticky ? 'text-pixel-lg sm:text-pixel-xl' : 'text-pixel-xl sm:text-pixel-2xl'
               }`}>
-                IdeaMan
+                IdeaVerse
               </span>
             </Link>
 
@@ -153,14 +154,6 @@ const Header = () => {
               >
                 Teams
               </Link>
-              <a 
-                href="#roadmap" 
-                className={`text-gray-700 hover:text-sunset-coral transition-colors font-pixel uppercase tracking-wider ${
-                  isScrolled && isSticky ? 'text-pixel-xs' : 'text-pixel-sm'
-                }`}
-              >
-                Roadmap
-              </a>
             </nav>
 
             {/* Desktop Actions */}
@@ -198,12 +191,12 @@ const Header = () => {
                         <div className={`font-pixel font-bold text-gray-800 uppercase tracking-wider ${
                           isScrolled && isSticky ? 'text-pixel-xs' : 'text-pixel-xs'
                         }`}>
-                          {hasSuperheroIdentity && superheroName ? superheroName : (address ? `${address.slice(0,6)}...${address.slice(-4)}` : 'Connected')}
+                          {isCheckingSuperhero ? 'Checking...' : (hasSuperheroIdentity && superheroName ? superheroName : (address ? `${address.slice(0,6)}...${address.slice(-4)}` : 'Connected'))}
                         </div>
                         <div className={`font-orbitron text-gray-600 uppercase tracking-wide ${
                           isScrolled && isSticky ? 'text-pixel-xs' : 'text-pixel-xs'
                         }`}>
-                          {hasSuperheroIdentity ? '🦸‍♂️ Superhero' : '🔗 Wallet Connected'}
+                          {isCheckingSuperhero ? '🔍 Verifying...' : (hasSuperheroIdentity ? '🦸‍♂️ Superhero' : '🔗 Wallet Connected')}
                         </div>
                       </div>
                     </button>
@@ -220,26 +213,32 @@ const Header = () => {
                             </div>
                             <div>
                               <div className="font-pixel font-bold text-pixel-sm text-gray-800 uppercase tracking-wider">
-                                {hasSuperheroIdentity && superheroName ? superheroName : (address ? `${address.slice(0,8)}...${address.slice(-6)}` : 'Connected')}
+                                {isCheckingSuperhero ? 'Checking...' : (hasSuperheroIdentity && superheroName ? superheroName : (address ? `${address.slice(0,8)}...${address.slice(-6)}` : 'Connected'))}
                               </div>
                               <div className="font-orbitron text-pixel-xs text-gray-600 uppercase tracking-wide">
-                                {hasSuperheroIdentity ? '🦸‍♂️ Superhero' : '🔗 Wallet Connected'}
+                                {isCheckingSuperhero ? '🔍 Verifying...' : (hasSuperheroIdentity ? '🦸‍♂️ Superhero' : '🔗 Wallet Connected')}
                               </div>
                             </div>
                           </div>
                           
                           {/* Identity Status */}
-                          <div className={`p-2 border mb-3 ${hasSuperheroIdentity ? 'bg-green-100 border-green-400' : 'bg-blue-100 border-blue-400'}`}>
+                          <div className={`p-2 border mb-3 ${
+                            isCheckingSuperhero ? 'bg-yellow-100 border-yellow-400' : (hasSuperheroIdentity ? 'bg-green-100 border-green-400' : 'bg-blue-100 border-blue-400')
+                          }`}>
                             <div className="flex items-center space-x-2">
-                              <div className={`w-2 h-2 border ${hasSuperheroIdentity ? 'bg-green-600 border-green-800' : 'bg-blue-600 border-blue-800'}`}></div>
-                              <span className={`font-pixel text-pixel-xs uppercase tracking-wider ${hasSuperheroIdentity ? 'text-green-800' : 'text-blue-800'}`}>
-                                {hasSuperheroIdentity ? 'Superhero Identity' : 'Wallet Connected'}
+                              <div className={`w-2 h-2 border ${
+                                isCheckingSuperhero ? 'bg-yellow-600 border-yellow-800 animate-pulse' : (hasSuperheroIdentity ? 'bg-green-600 border-green-800' : 'bg-blue-600 border-blue-800')
+                              }`}></div>
+                              <span className={`font-pixel text-pixel-xs uppercase tracking-wider ${
+                                isCheckingSuperhero ? 'text-yellow-800' : (hasSuperheroIdentity ? 'text-green-800' : 'text-blue-800')
+                              }`}>
+                                {isCheckingSuperhero ? 'Checking Identity...' : (hasSuperheroIdentity ? 'Superhero Identity' : 'Wallet Connected')}
                               </span>
                             </div>
                           </div>
                         </div>
                         <div className="p-2 space-y-2">
-                          {!hasSuperheroIdentity && (
+                          {!isCheckingSuperhero && !hasSuperheroIdentity && (
                             <Link
                               to="/create-superhero"
                               onClick={() => setIsUserMenuOpen(false)}
@@ -249,7 +248,7 @@ const Header = () => {
                               <span>CREATE IDENTITY</span>
                             </Link>
                           )}
-                          {hasSuperheroIdentity && (
+                          {!isCheckingSuperhero && hasSuperheroIdentity && (
                             <Link
                               to="/profile/me"
                               onClick={() => setIsUserMenuOpen(false)}
@@ -258,6 +257,12 @@ const Header = () => {
                               <User className="w-4 h-4" />
                               <span>VIEW PROFILE</span>
                             </Link>
+                          )}
+                          {isCheckingSuperhero && (
+                            <div className="w-full flex items-center space-x-2 px-3 py-2 bg-yellow-50 border border-yellow-400 font-pixel text-pixel-xs text-yellow-600 uppercase tracking-wider opacity-75">
+                              <div className="w-4 h-4 border-2 border-yellow-600 border-t-transparent animate-spin rounded-full"></div>
+                              <span>CHECKING IDENTITY...</span>
+                            </div>
                           )}
                           
                           {/* My Purchases Link */}

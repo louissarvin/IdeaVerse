@@ -35,7 +35,6 @@ const BackendStatus: React.FC = () => {
         setMessage('Backend is syncing...');
       }
     } catch (error: unknown) {
-      console.log('Backend status error:', error);
       
       // Check if it's a 503 error (service unavailable but running)
       if (error && typeof error === 'object' && 'response' in error) {

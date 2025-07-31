@@ -117,26 +117,19 @@ app.post('/prepare-metadata', async (c) => {
     
     if (formData?.get('content')) {
       const contentFile = formData.get('content') as File;
-      console.log('📄 Uploading content to IPFS...');
       
       const contentUpload = await ipfs.uploadFile(contentFile, `${data.title}-content`);
       contentUrl = contentUpload.url;
-      
-      console.log('✅ Content uploaded:', contentUrl);
     }
 
     if (formData?.get('image')) {
       const imageFile = formData.get('image') as File;
-      console.log('🖼️ Uploading image to IPFS...');
       
       const imageUpload = await ipfs.uploadFile(imageFile, `${data.title}-image`);
       imageUrl = imageUpload.url;
-      
-      console.log('✅ Image uploaded:', imageUrl);
     }
 
     // Step 2: Create idea metadata
-    console.log('📄 Creating idea metadata...');
     const metadataUpload = await ipfs.createIdeaMetadata({
       title: data.title,
       description: data.description,
@@ -144,11 +137,8 @@ app.post('/prepare-metadata', async (c) => {
       contentHash: contentUrl ? contentUrl.replace('ipfs://', '') : undefined,
       imageHash: imageUrl ? imageUrl.replace('ipfs://', '') : undefined
     });
-    
-    console.log('✅ Metadata uploaded:', metadataUpload.url);
 
     // Return metadata for frontend to use in contract interaction
-    console.log('✅ Metadata prepared for frontend contract interaction');
     
     return c.json({
       success: true,
@@ -162,7 +152,6 @@ app.post('/prepare-metadata', async (c) => {
     });
 
   } catch (error) {
-    console.error('❌ Idea creation error:', error);
     return c.json({
       success: false,
       error: { 
@@ -367,7 +356,6 @@ app.post('/:id/purchase', zValidator('json', purchaseSchema), async (c) => {
       }, 400);
     }
 
-    console.log(`💰 Processing purchase request for idea ${ideaId} by ${buyerAddress}`);
 
     // Execute the purchase on blockchain
     const purchaseResult = await blockchain.buyIdea(ideaId, buyerAddress);
@@ -393,7 +381,6 @@ app.post('/:id/purchase', zValidator('json', purchaseSchema), async (c) => {
     });
 
   } catch (error) {
-    console.error('Purchase failed:', error);
     return c.json({
       success: false,
       error: { code: 'PURCHASE_ERROR', message: (error as Error).message }
@@ -421,20 +408,17 @@ app.get('/:id/content', async (c) => {
       }, 400);
     }
 
-    console.log(`🔓 Attempting to decrypt content for idea ${ideaId} for buyer ${buyerAddress}`);
 
     // First verify that the user owns this idea OR has purchased it
     const isOwner = await blockchain.checkIdeaOwnership(ideaId, buyerAddress);
     let hasAccess = isOwner;
     
     if (!isOwner) {
-      console.log(`🔍 User doesn't currently own idea ${ideaId}, checking purchase history...`);
       // Check if user has purchased this idea
       const purchaseHistory = await blockchain.getPurchaseHistory(buyerAddress);
       const hasPurchased = purchaseHistory.some(purchase => purchase.ideaId === ideaId);
       
       if (hasPurchased) {
-        console.log(`✅ User has purchased idea ${ideaId} - allowing content access`);
         hasAccess = true;
       }
     }
@@ -483,7 +467,6 @@ app.get('/:id/content', async (c) => {
       });
 
     } catch (ipfsError) {
-      console.error('IPFS content retrieval failed:', ipfsError);
       return c.json({
         success: false,
         error: { code: 'CONTENT_ERROR', message: 'Failed to retrieve idea content' }
@@ -491,7 +474,6 @@ app.get('/:id/content', async (c) => {
     }
 
   } catch (error) {
-    console.error('Content decryption failed:', error);
     return c.json({
       success: false,
       error: { code: 'DECRYPTION_ERROR', message: (error as Error).message }
@@ -540,7 +522,6 @@ app.get('/:id/purchase-status', async (c) => {
     });
 
   } catch (error) {
-    console.error('Purchase status check failed:', error);
     return c.json({
       success: false,
       error: { code: 'STATUS_ERROR', message: (error as Error).message }
@@ -570,7 +551,6 @@ app.get('/:ideaId/ownership', async (c) => {
       }, 400);
     }
 
-    console.log(`🔍 Checking ownership of idea ${ideaId} for user ${userAddress}`);
 
     // Check if the user owns the idea NFT
     const isOwner = await blockchain.checkIdeaOwnership(ideaId, userAddress);
@@ -585,7 +565,6 @@ app.get('/:ideaId/ownership', async (c) => {
     });
 
   } catch (error) {
-    console.error('Ownership check failed:', error);
     return c.json({
       success: false,
       error: { code: 'OWNERSHIP_ERROR', message: (error as Error).message }
@@ -606,12 +585,10 @@ app.get('/purchased-by/:userAddress', async (c) => {
       }, 400);
     }
 
-    console.log(`🛒 Getting purchased ideas for user: ${userAddress}`);
 
     // Get purchase history from blockchain
     const purchaseHistory = await blockchain.getPurchaseHistory(userAddress);
     
-    console.log(`📋 Found ${purchaseHistory.length} purchase transactions`);
     
     // Get full idea details for each purchased idea
     const purchasedIdeas = [];
@@ -630,7 +607,6 @@ app.get('/purchased-by/:userAddress', async (c) => {
           }
         });
       } catch (err) {
-        console.warn(`Failed to get details for purchased idea ${purchase.ideaId}:`, err);
       }
     }
 
@@ -640,7 +616,6 @@ app.get('/purchased-by/:userAddress', async (c) => {
     });
 
   } catch (error) {
-    console.error('Failed to get purchased ideas:', error);
     return c.json({
       success: false,
       error: { code: 'PURCHASE_HISTORY_ERROR', message: (error as Error).message }

@@ -42,11 +42,6 @@ const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({ idea, isOpen, onClose
   if (!isOpen || !idea) return null;
 
   // Debug logging
-  console.log(`🔍 IdeaDetailModal - Idea ${idea.id} ownership status:`, {
-    isOwned: idea.isOwned,
-    isSold: idea.isSold,
-    title: idea.title
-  });
 
   const handleLike = () => {
     likeIdea(idea.id);

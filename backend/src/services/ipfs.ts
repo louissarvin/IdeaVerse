@@ -10,15 +10,11 @@ export class IPFSService {
       pinataJwt: process.env.PINATA_JWT!,
       pinataGateway: 'gateway.pinata.cloud'
     });
-    
-    console.log('🔧 IPFS Service initialized with Pinata');
   }
 
   // Upload file to IPFS
   async uploadFile(file: File | Blob, name?: string): Promise<IPFSUploadResult> {
     try {
-      console.log('📤 Uploading file to Pinata via direct API...');
-      
       const formData = new FormData();
       formData.append('file', file);
       formData.append('pinataMetadata', JSON.stringify({
@@ -42,7 +38,6 @@ export class IPFSService {
       }
 
       const upload = await response.json();
-      console.log('✅ File uploaded successfully:', upload.IpfsHash);
 
       return {
         hash: upload.IpfsHash,
@@ -50,7 +45,6 @@ export class IPFSService {
         gateway_url: `https://gateway.pinata.cloud/ipfs/${upload.IpfsHash}`
       };
     } catch (error) {
-      console.error('❌ File upload failed:', error);
       throw new Error(`Failed to upload file to IPFS: ${error}`);
     }
   }
@@ -58,8 +52,6 @@ export class IPFSService {
   // Upload JSON metadata to IPFS
   async uploadJSON(data: object, name?: string): Promise<IPFSUploadResult> {
     try {
-      console.log('📤 Uploading JSON metadata to Pinata...');
-      
       const formData = new FormData();
       formData.append('file', new Blob([JSON.stringify(data)], { type: 'application/json' }));
       formData.append('pinataMetadata', JSON.stringify({
@@ -83,7 +75,6 @@ export class IPFSService {
       }
 
       const upload = await response.json();
-      console.log('✅ JSON uploaded successfully:', upload.IpfsHash);
 
       return {
         hash: upload.IpfsHash,
@@ -91,7 +82,6 @@ export class IPFSService {
         gateway_url: `https://gateway.pinata.cloud/ipfs/${upload.IpfsHash}`
       };
     } catch (error) {
-      console.error('❌ JSON upload failed:', error.message);
       throw new Error(`Failed to upload JSON to IPFS: ${error.message}`);
     }
   }
@@ -224,7 +214,6 @@ export class IPFSService {
       await this.pinata.testAuthentication();
       return true;
     } catch (error) {
-      console.error('Pinata connection test failed:', error);
       return false;
     }
   }

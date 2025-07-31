@@ -19,12 +19,7 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ isOpen, onClose, onCr
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Debug logging to understand the state issue
-  console.log('🏗️ CreateTeamModal state check:', {
-    isConnected,
-    address,
-    hasSuperheroIdentity,
-    superheroName
-  });
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [formData, setFormData] = useState({
@@ -223,7 +218,6 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ isOpen, onClose, onCr
       setCurrentStep(1);
 
     } catch (err) {
-      console.error('Failed to create team:', err);
       setError(err instanceof Error ? err.message : 'Failed to create team');
     } finally {
       setIsSubmitting(false);

@@ -49,8 +49,6 @@ const MyPurchasesPage: React.FC = () => {
     setError(null);
     
     try {
-      console.log(`🛒 Loading purchased ideas for ${address}...`);
-      
       // First try to get purchase history from blockchain events
       const purchaseHistoryResponse = await ApiService.getPurchasedIdeas(address);
       
@@ -58,28 +56,21 @@ const MyPurchasesPage: React.FC = () => {
       
       if (purchaseHistoryResponse.success && purchaseHistoryResponse.data.length > 0) {
         // Process blockchain purchase history
-        console.log(`📋 Found ${purchaseHistoryResponse.data.length} purchase transactions`);
         
         for (const idea of purchaseHistoryResponse.data) {
           try {
-            console.log(`🎯 Processing purchased idea: ${idea.title} (ID: ${idea.ideaId})`);
-            
             // Try to fetch real superhero identity for the creator
             let realCreatorName = idea.creatorName || idea.creator;
             try {
-              console.log(`🦸‍♂️ Fetching superhero identity for creator: ${idea.creator}`);
               const superheroResponse = await ApiService.getSuperheroByAddress(idea.creator);
               
               if (superheroResponse.success && superheroResponse.data && superheroResponse.data.name) {
                 realCreatorName = superheroResponse.data.name;
-                console.log(`✅ Found real superhero name: ${realCreatorName} for ${idea.creator}`);
               } else {
-                console.log(`⚠️ No superhero identity found for ${idea.creator}, using fallback`);
                 // Use a clean fallback instead of wallet address
                 realCreatorName = 'Anonymous Superhero';
               }
             } catch (superheroError) {
-              console.warn(`Failed to fetch superhero identity for ${idea.creator}:`, superheroError);
               realCreatorName = 'Anonymous Superhero';
             }
             
@@ -97,42 +88,34 @@ const MyPurchasesPage: React.FC = () => {
             });
             
           } catch (err) {
-            console.warn(`Failed to process purchased idea ${idea.ideaId}:`, err);
+            // Failed to process purchased idea
           }
         }
       } else {
         // Fallback: Check ownership for all ideas (previous logic)
-        console.log('📋 No purchase events found, checking ownership...');
         
         const allIdeasResponse = await ApiService.getIdeas(1, 100, false);
         if (allIdeasResponse.success) {
           
           for (const idea of allIdeasResponse.data) {
             try {
-              console.log(`🔍 Checking ownership for idea ${idea.ideaId}: "${idea.title}"`);
-              
               const ownershipResponse = await ApiService.getIdeaOwnership(parseInt(idea.ideaId), address);
               
               if (ownershipResponse.success && ownershipResponse.data?.isOwner) {
                 const isCreatedByUser = idea.creator.toLowerCase() === address.toLowerCase();
-                console.log(`🎯 Idea ${idea.ideaId} owned by user: ${ownershipResponse.data.isOwner}, created by user: ${isCreatedByUser}`);
                 
                 if (!isCreatedByUser) {
                   // Try to fetch real superhero identity for the creator
                   let realCreatorName = idea.creatorName || idea.creator;
                   try {
-                    console.log(`🦸‍♂️ Fetching superhero identity for creator: ${idea.creator}`);
                     const superheroResponse = await ApiService.getSuperheroByAddress(idea.creator);
                     
                     if (superheroResponse.success && superheroResponse.data && superheroResponse.data.name) {
                       realCreatorName = superheroResponse.data.name;
-                      console.log(`✅ Found real superhero name: ${realCreatorName} for ${idea.creator}`);
                     } else {
-                      console.log(`⚠️ No superhero identity found for ${idea.creator}, using fallback`);
                       realCreatorName = 'Anonymous Superhero';
                     }
                   } catch (superheroError) {
-                    console.warn(`Failed to fetch superhero identity for ${idea.creator}:`, superheroError);
                     realCreatorName = 'Anonymous Superhero';
                   }
                   
@@ -148,22 +131,19 @@ const MyPurchasesPage: React.FC = () => {
                     categories: idea.categories || ['General'],
                     ipfsHash: idea.ipfsHash
                   });
-                  console.log(`✅ Added owned idea: ${idea.title} by ${realCreatorName}`);
                 }
               }
               
             } catch (err) {
-              console.warn(`Failed to check ownership for idea ${idea.ideaId}:`, err);
+              // Failed to check ownership for idea
             }
           }
         }
       }
       
-      console.log(`✅ Found ${purchasedIdeas.length} purchased ideas total`);
       setPurchasedIdeas(purchasedIdeas);
       
     } catch (err) {
-      console.error('❌ Failed to load purchased ideas:', err);
       setError(err instanceof Error ? err.message : 'Failed to load purchased ideas');
     } finally {
       setLoading(false);
@@ -176,20 +156,11 @@ const MyPurchasesPage: React.FC = () => {
   };
 
   const handleRateCreator = async (idea: PurchasedIdea) => {
-    console.log('🌟 Opening rating modal for idea:', idea.title, 'by', idea.creatorName);
-    console.log('🔍 Creator address:', idea.creator);
-
     // First, try to fetch real superhero identity from backend
     try {
-      console.log('🦸‍♂️ Fetching real superhero identity for:', idea.creator);
       const superheroResponse = await ApiService.getSuperheroByAddress(idea.creator);
       
-      console.log('📡 Full API Response:', JSON.stringify(superheroResponse, null, 2));
-      
       if (superheroResponse.success && superheroResponse.data) {
-        console.log('✅ Found REAL superhero identity:', superheroResponse.data);
-        console.log('🏷️ Real superhero name:', superheroResponse.data.name);
-        console.log('🖼️ Real superhero avatar:', superheroResponse.data.avatarUrl);
         
         // Use REAL superhero data from backend
         const enhancedIdea = {
@@ -201,24 +172,11 @@ const MyPurchasesPage: React.FC = () => {
           creatorSkills: superheroResponse.data.skills || idea.categories || ['Creativity']
         };
         
-        console.log('🎯 Final enhanced idea data:', {
-          creatorName: enhancedIdea.creatorName,
-          creatorAvatar: enhancedIdea.creatorAvatar,
-          creatorBio: enhancedIdea.creatorBio
-        });
-        
         setRatingModalIdea(enhancedIdea);
         return;
-      } else {
-        console.log('⚠️ API Response failed or no data:', {
-          success: superheroResponse.success,
-          hasData: !!superheroResponse.data,
-          message: superheroResponse.message
-        });
       }
     } catch (error) {
-      console.error('❌ Failed to fetch superhero identity:', error);
-      console.log('📧 Error details:', error?.message || 'Unknown error');
+      // Failed to fetch superhero identity
     }
 
     // Fallback: Use clean display name instead of ugly address
@@ -235,7 +193,6 @@ const MyPurchasesPage: React.FC = () => {
       creatorSkills: idea.categories || ['Creativity']
     };
     
-    console.log('🔄 Using fallback data - Clean name:', cleanName);
     setRatingModalIdea(fallbackIdea);
   };
 

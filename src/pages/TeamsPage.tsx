@@ -47,7 +47,7 @@ const roles = ['All', 'Frontend', 'Backend', 'Designer', 'Product', 'Marketing',
 
 const TeamsPage = () => {
   const { user, refreshData } = useApp();
-  const { isConnected, address, hasSuperheroIdentity, superheroName } = useWallet();
+  const { isConnected, address, hasSuperheroIdentity, superheroName, isCheckingSuperhero } = useWallet();
   const { showSuccess, showError, showInfo, showWarning } = useToast();
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedRole, setSelectedRole] = useState('All');
@@ -70,7 +70,6 @@ const TeamsPage = () => {
     
     // Set up periodic refresh every 30 seconds for real-time updates
     const refreshInterval = setInterval(async () => {
-      console.log('🔄 Auto-refreshing teams data...');
       setIsAutoRefreshing(true);
       await loadTeams(false); // Don't show loading indicator for automatic refreshes
       setIsAutoRefreshing(false);
@@ -84,7 +83,6 @@ const TeamsPage = () => {
   // Also refresh when wallet connection changes
   useEffect(() => {
     if (isConnected && address) {
-      console.log('🔄 Wallet state changed, refreshing teams...');
       loadTeams(false); // Don't show loading for wallet state changes
     }
   }, [isConnected, address]);
@@ -95,24 +93,19 @@ const TeamsPage = () => {
         setIsLoading(true);
       }
       setError(null);
-      console.log('🔄 Loading teams - trying blockchain first...');
       
       // Try blockchain first since it's more reliable
       try {
         await loadTeamsFromBlockchain();
-        console.log('✅ Teams loaded successfully from blockchain');
         return;
       } catch (blockchainError) {
-        console.warn('⚠️ Blockchain loading failed, falling back to API:', blockchainError);
+        // Blockchain loading failed, fallback to API
       }
       
       // Fallback to API if blockchain fails
-      console.log('🔄 Loading teams from API as fallback...');
       const response = await ApiService.getTeams(1, 50);
       
       if (response.success && response.data) {
-        console.log(`📊 Found ${response.data.length} teams from API`);
-        
         // Transform API team data to UI format
         const transformedTeams: Team[] = await Promise.all(
           response.data.map(async (apiTeam: APITeam, index: number) => {
@@ -162,7 +155,7 @@ const TeamsPage = () => {
                   };
                 }
               } catch (heroError) {
-                console.warn(`Failed to fetch leader data for ${apiTeam.leader}:`, heroError);
+                // Failed to fetch leader data
               }
 
               // Calculate if team is full
@@ -195,7 +188,6 @@ const TeamsPage = () => {
                 progressSubmitted: false,
               };
             } catch (transformError) {
-              console.warn(`Failed to transform team ${apiTeam.team_id}:`, transformError);
               return null;
             }
           })
@@ -203,19 +195,14 @@ const TeamsPage = () => {
 
         const validTeams = transformedTeams.filter(team => team !== null) as Team[];
         setTeams(validTeams);
-        console.log(`✅ Successfully loaded ${validTeams.length} teams from API`);
       } else {
-        console.warn('⚠️ No teams found in API, trying blockchain fallback...');
         setError('Loading from blockchain...');
         await loadTeamsFromBlockchain();
       }
     } catch (error) {
-      console.error('❌ Failed to load teams from API:', error);
-      console.log('🔄 API failed, trying blockchain fallback...');
       try {
         await loadTeamsFromBlockchain();
       } catch (blockchainError) {
-        console.error('❌ Blockchain fallback also failed:', blockchainError);
         setError('Failed to load teams from both API and blockchain. Please try again.');
         setTeams([]);
       }
@@ -226,24 +213,17 @@ const TeamsPage = () => {
 
   const loadTeamsFromBlockchain = async () => {
     try {
-      console.log('🔗 Loading teams directly from blockchain...');
-      
       // Ensure web3Service has a provider
       if (!web3Service['provider']) {
-        console.log('🔌 No provider found, attempting to initialize...');
         try {
           await web3Service.connectWallet();
-          console.log('✅ Wallet connected for blockchain reading');
         } catch (connectError) {
-          console.error('❌ Failed to connect wallet for blockchain reading:', connectError);
           throw new Error('Cannot read from blockchain: wallet connection required');
         }
       }
       
       // Get total number of teams from smart contract
-      console.log('📡 Calling getTotalTeams()...');
       const totalTeams = await web3Service.getTotalTeams();
-      console.log(`📊 Found ${totalTeams} teams on blockchain`);
       
       if (totalTeams === 0) {
         setTeams([]);
@@ -255,10 +235,7 @@ const TeamsPage = () => {
       
       for (let teamId = 1; teamId <= totalTeams; teamId++) {
         try {
-          console.log(`🔍 Loading team ${teamId} from blockchain...`);
           const teamDetails = await web3Service.getTeamDetails(teamId);
-          
-          console.log(`📋 Raw team ${teamId} details:`, teamDetails);
           
           if (teamDetails) {
             // Convert USDC amounts from wei format (6 decimals) to human-readable format
@@ -292,20 +269,9 @@ const TeamsPage = () => {
                 };
               }
             } catch (heroError) {
-              console.warn(`Failed to fetch leader data for ${teamDetails.leader}:`, heroError);
+              // Failed to fetch leader data
             }
 
-            console.log(`🏷️ Team ${teamId} raw blockchain data:`, teamDetails);
-            console.log(`🏷️ Team ${teamId} parsed data:`, {
-              teamName: teamDetails.teamName,
-              description: teamDetails.description,
-              projectName: teamDetails.projectName,
-              roles: teamDetails.roles,
-              tags: teamDetails.tags,
-              requiredMembers: teamDetails.requiredMembers,
-              currentMembers: teamDetails.members?.length || 0,
-              status: teamDetails.status
-            });
             
             // Load team members from blockchain
             let teamMembers: TeamMember[] = [];
@@ -325,8 +291,6 @@ const TeamsPage = () => {
                 isLeader: false,
                 stakedTokens: stakeAmountReadable
               }));
-              
-              console.log(`👥 Loaded ${teamMembers.length} team members for team ${teamId}`);
             }
 
             // Fix team data issues - add fallback data for incomplete teams
@@ -342,13 +306,6 @@ const TeamsPage = () => {
             const isFull = currentMembers >= maxMembers;
             const isRecruiting = !isFull && (teamDetails.status === 0 || currentMembers <= 1);
             
-            console.log(`📊 Team ${teamDetails.teamId} recruiting status:`, {
-              currentMembers,
-              maxMembers,
-              isFull,
-              isRecruiting,
-              status: teamDetails.status
-            });
 
             const team: Team = {
               id: teamDetails.teamId,
@@ -380,16 +337,14 @@ const TeamsPage = () => {
             };
             
             blockchainTeams.push(team);
-            console.log(`✅ Loaded team ${teamId}: ${team.name}`);
           }
         } catch (teamError) {
-          console.warn(`Failed to load team ${teamId}:`, teamError);
+          // Failed to load team
         }
       }
       
       // Add some mock recruiting teams if none exist for testing
       if (blockchainTeams.length === 0 || blockchainTeams.every(team => !team.isRecruiting)) {
-        console.log('🎭 Adding mock recruiting teams for testing...');
         const mockTeams: Team[] = [
           {
             id: 9001,
@@ -460,10 +415,8 @@ const TeamsPage = () => {
       }
 
       setTeams(blockchainTeams);
-      console.log(`✅ Successfully loaded ${blockchainTeams.length} teams from blockchain (${blockchainTeams.filter(t => t.isRecruiting).length} recruiting)`);
       
     } catch (error) {
-      console.error('❌ Failed to load teams from blockchain:', error);
       throw error;
     }
   };
@@ -548,21 +501,11 @@ const TeamsPage = () => {
     try {
       showInfo('Joining Team', 'Processing your team join request...');
       
-      console.log(`🎭 Mock: User ${superheroName} joining team ${teamId} with ${stakeAmount} USDC stake`);
-      console.log(`📋 Join team parameters:`, {
-        teamId,
-        userAddress: address,
-        stakeAmount,
-        superheroName: superheroName,
-        role: role
-      });
-      
       // Mock delay to simulate blockchain transaction
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Mock transaction hash
       const mockTxHash = `0x${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 10)}`;
-      console.log(`✅ Mock: Smart contract team join successful: ${mockTxHash}`);
       
       // Update the team data locally to reflect the join
       setTeams(prevTeams => 
@@ -618,11 +561,8 @@ const TeamsPage = () => {
     try {
       showInfo('Creating Team', 'Checking USDC balance...');
       
-      console.log('🏗️ Creating team with data:', teamData);
-      
       // Check USDC balance first (leader stakes same amount as members)
       const leaderStakeRequired = teamData.requiredStake;
-      console.log(`💰 Checking USDC balance for leader stake: ${leaderStakeRequired} USDC`);
       
       const usdcStatus = await web3Service.checkUSDCAllowanceAndBalance(
         leaderStakeRequired.toString(), 
@@ -635,7 +575,6 @@ const TeamsPage = () => {
         try {
           await web3Service.mintUSDC('10000', address);
           showInfo('Creating Team', 'USDC minted! Proceeding with team creation...');
-          console.log(`✅ Minted 10,000 USDC tokens to ${address}`);
         } catch (mintError) {
           throw new Error(`Failed to mint USDC tokens: ${mintError instanceof Error ? mintError.message : 'Unknown error'}`);
         }
@@ -654,15 +593,11 @@ const TeamsPage = () => {
         tags: teamData.tags
       });
       
-      console.log(`✅ Smart contract team creation successful: ${txHash}`);
-      
       // Try to record in backend API (non-critical - team exists on blockchain)
       try {
         showInfo('Saving Team', 'Recording team in database...');
         await ApiService.createTeam(teamData, projectFiles);
-        console.log(`✅ Backend API recording successful${projectFiles ? ` with ${projectFiles.length} files` : ''}`);
       } catch (apiError) {
-        console.warn('⚠️ Backend API recording failed, but team exists on blockchain:', apiError);
         showWarning(
           'Team Created on Blockchain', 
           'Team created successfully on blockchain, but database sync failed. The team will appear once the indexer syncs.'
@@ -670,7 +605,6 @@ const TeamsPage = () => {
       }
       
       // Refresh teams data immediately after creation
-      console.log('🔄 Refreshing teams after successful creation...');
       await loadTeams(false); // Don't show loading indicator
       
       showSuccess(
@@ -763,13 +697,19 @@ const TeamsPage = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setIsCreateModalOpen(true)}
-                    disabled={!isConnected || !hasSuperheroIdentity}
+                    disabled={!isConnected || isCheckingSuperhero || !hasSuperheroIdentity}
                     className="flex items-center space-x-2 bg-gradient-to-r from-sunset-coral to-moss-green text-white px-6 py-2 border-2 border-gray-800 font-pixel font-bold text-pixel-sm hover:shadow-lg transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider"
                   >
-                    <Crown className="w-4 h-4" />
+                    {isCheckingSuperhero ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full"></div>
+                    ) : (
+                      <Crown className="w-4 h-4" />
+                    )}
                     <span>
                       {!isConnected 
                         ? 'CONNECT WALLET' 
+                        : isCheckingSuperhero
+                          ? 'CHECKING...'
                         : !hasSuperheroIdentity 
                           ? 'CREATE SUPERHERO FIRST' 
                           : 'CREATE TEAM'}

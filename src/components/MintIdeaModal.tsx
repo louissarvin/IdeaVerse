@@ -200,13 +200,6 @@ const MintIdeaModal: React.FC<MintIdeaModalProps> = ({ isOpen, onClose }) => {
     setProgress('Preparing idea data...');
 
     try {
-      console.log('🚀 Creating idea with NEW workflow:', {
-        title: formData.title,
-        description: formData.description,
-        categories: formData.categories,
-        price: parseFloat(formData.price),
-        userAddress: address,
-      });
 
       // Step 1: Upload files and metadata to IPFS via backend
       setProgress('Uploading files to IPFS...');
@@ -223,7 +216,6 @@ const MintIdeaModal: React.FC<MintIdeaModalProps> = ({ isOpen, onClose }) => {
         throw new Error(metadataResponse.error?.message || 'Failed to upload metadata to IPFS');
       }
 
-      console.log('✅ Metadata uploaded:', metadataResponse.data);
 
       // Step 2: Connect to user's wallet and create idea on blockchain
       setProgress('Connecting to your wallet...');
@@ -243,7 +235,6 @@ const MintIdeaModal: React.FC<MintIdeaModalProps> = ({ isOpen, onClose }) => {
         price: parseFloat(formData.price)
       });
 
-      console.log('✅ Blockchain transaction successful:', contractResult);
 
       // Step 3: Show success message
       setProgress(null);
@@ -254,7 +245,7 @@ const MintIdeaModal: React.FC<MintIdeaModalProps> = ({ isOpen, onClose }) => {
         try {
           await refreshIdeas();
         } catch (e) {
-          console.log('Note: Ideas will appear when indexer processes the transaction');
+          // Note: Ideas will appear when indexer processes the transaction
         }
       }, 5000);
       
@@ -276,7 +267,6 @@ const MintIdeaModal: React.FC<MintIdeaModalProps> = ({ isOpen, onClose }) => {
       }, 3000);
 
     } catch (err) {
-      console.error('❌ Failed to create idea:', err);
       setError(err instanceof Error ? err.message : 'Failed to create idea');
       setProgress(null);
     } finally {

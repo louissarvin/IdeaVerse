@@ -13,30 +13,29 @@ const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (isOpen) {
-      console.log('🔳 WalletModal opened');
+      
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleConnect = async (walletType: string) => {
-    console.log('🦊 MetaMask connect button clicked, type:', walletType);
+    
     
     if (walletType !== 'metamask') {
-      console.log('❌ Unsupported wallet type:', walletType);
+      
       setError('Only MetaMask is supported at this time');
       return;
     }
 
     setError(null);
-    console.log('✅ Starting MetaMask connection...');
+    
 
     try {
       await connectWallet();
-      console.log('✅ Connection successful, closing modal...');
+      
       onClose();
     } catch (err) {
-      console.error('❌ Connection failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to connect wallet');
     }
   };
